@@ -1,0 +1,25 @@
+--cpu=Cortex-M4.fp.sp
+"hiwonder_led\startup_stm32f407xx.o"
+"hiwonder_led\main.o"
+"hiwonder_led\stm32f4xx_it.o"
+"hiwonder_led\stm32f4xx_hal_msp.o"
+"hiwonder_led\stm32f4xx_hal_tim.o"
+"hiwonder_led\stm32f4xx_hal_tim_ex.o"
+"hiwonder_led\stm32f4xx_hal_rcc.o"
+"hiwonder_led\stm32f4xx_hal_rcc_ex.o"
+"hiwonder_led\stm32f4xx_hal_flash.o"
+"hiwonder_led\stm32f4xx_hal_flash_ex.o"
+"hiwonder_led\stm32f4xx_hal_flash_ramfunc.o"
+"hiwonder_led\stm32f4xx_hal_gpio.o"
+"hiwonder_led\stm32f4xx_hal_dma_ex.o"
+"hiwonder_led\stm32f4xx_hal_dma.o"
+"hiwonder_led\stm32f4xx_hal_pwr.o"
+"hiwonder_led\stm32f4xx_hal_pwr_ex.o"
+"hiwonder_led\stm32f4xx_hal_cortex.o"
+"hiwonder_led\stm32f4xx_hal.o"
+"hiwonder_led\stm32f4xx_hal_exti.o"
+"hiwonder_led\system_stm32f4xx.o"
+--strict --scatter "Hiwonder_LED\Hiwonder_LED.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "Hiwonder_LED.map" -o Hiwonder_LED\Hiwonder_LED.axf
