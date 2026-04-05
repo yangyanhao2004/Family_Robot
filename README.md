@@ -1,37 +1,32 @@
-# graduation_project
+# graduation_project2
 
-#### 介绍
-为解决上班族工作时间担心独居老人或独自在家的儿童出现安全问题，本项目实现了一个可远程通信及移动控制的机器人，方便上班族随时查看家庭情况与家庭成员进行沟通。
+Family service robot graduation project, organized as four clear subsystems:
 
-#### 软件架构
-软件架构说明
+- `Family_Robot_Back_PC`: backend services, WebSocket routing, signaling
+- `Family_Robot_Web_PC`: web control panel UI
+- `Family_Robot_pi`: Raspberry Pi runtime (voice agent + remote control client)
+- `Family_Robot_STM32`: low-level embedded hardware firmware
 
+## Current Pi Merge Status
 
-#### 安装教程
+`Family_Robot_pi` now contains both:
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+- the original Pi WebSocket control/status logic
+- the complete local voice-agent stack from `pibot_local_agent-main`
 
-#### 使用说明
+This keeps the top-level structure simple while preserving subsystem boundaries.
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+## Quick Start
 
-#### 参与贡献
+1. Start backend (`Family_Robot_Back_PC`).
+2. Start web panel (`Family_Robot_Web_PC`) if remote control UI is needed.
+3. On Raspberry Pi, run `Family_Robot_pi/main.py`:
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+```bash
+python main.py --mode all
+```
 
+## Notes
 
-#### 特技
-
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+- `pibot_local_agent-main` is kept for historical reference during transition.
+- New Pi development should target `Family_Robot_pi`.

@@ -1,8 +1,10 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from core.connection_manager import manager
 from core.rtc_service import rtc_service
+from core.video_stream import video_hub
 from models.common import BaseMessage, RegisterMessage, ErrorMessage
 
 # 配置日志
@@ -132,7 +134,32 @@ async def websocket_route(websocket: WebSocket):
 
 @app.get("/video/stream")
 async def video_stream():
-    raise HTTPException(status_code=501, detail="Not Implemented")
+    async def mjpeg_generator():
+        last_seq = 0
+        while True:
+            frame_item = await video_hub.wait_next_frame(last_seq)
+            if frame_item is None:
+                # No frame yet (or camera paused), keep waiting.
+                continue
+
+            last_seq, jpeg_bytes = frame_item
+            header = (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n"
+                b"Cache-Control: no-cache\r\n"
+                b"Pragma: no-cache\r\n"
+                + f"Content-Length: {len(jpeg_bytes)}\r\n\r\n".encode("ascii")
+            )
+            yield header + jpeg_bytes + b"\r\n"
+
+    return StreamingResponse(
+        mjpeg_generator(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
 
 @app.get("/")
 async def root():

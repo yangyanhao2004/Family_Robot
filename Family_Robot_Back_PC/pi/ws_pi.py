@@ -1,75 +1,91 @@
 import asyncio
+import base64
+import binascii
 import logging
+
 from fastapi import WebSocket, WebSocketDisconnect
+
 from core.connection_manager import manager
 from core.message_router import router
+from core.video_stream import video_hub
+from models.common import ErrorMessage, RegisterMessage
 from pi.handlers import handle_status_message, handle_webrtc_signaling_message
-from models.common import RegisterMessage, BaseMessage, ErrorMessage
 
-# 配置日志
-logger = logging.getLogger('backend.pi')
+
+logger = logging.getLogger("backend.pi")
+
 
 async def websocket_pi_endpoint(websocket: WebSocket):
     client_ip = websocket.client.host
     client_port = websocket.client.port
-    logger.info(f"树莓派连接已注册: {client_ip}:{client_port}")
+    logger.info("Pi client registered: %s:%s", client_ip, client_port)
     manager.register_pi(websocket)
-    
+
     try:
-        logger.info(f"开始处理树莓派 {client_ip}:{client_port} 的消息")
+        logger.info("Start handling Pi messages from %s:%s", client_ip, client_port)
         while True:
-            # 设置较长的接收超时时间，例如60秒
             try:
                 data = await asyncio.wait_for(websocket.receive_json(), timeout=60.0)
-                logger.debug(f"收到树莓派 {client_ip}:{client_port} 的消息: {data}")
-                
+                logger.debug("Message from Pi %s:%s -> %s", client_ip, client_port, data.get("type"))
+
                 try:
-                    base_msg = BaseMessage(**data)
-                    message_type = base_msg.type
-                    
+                    message_type = data.get("type")
+                    if not message_type:
+                        raise ValueError("Missing message type")
+
                     if message_type == "register":
-                        register_msg = RegisterMessage(**data)
-                        logger.info(f"树莓派 {client_ip}:{client_port} 重新注册")
-                        # 发送注册成功消息
-                        register_success_msg = {
-                            "type": "register_success"
-                        }
-                        await websocket.send_json(register_success_msg)
-                        logger.info(f"发送注册成功消息给树莓派 {client_ip}:{client_port}")
+                        RegisterMessage(**data)
+                        await websocket.send_json({"type": "register_success"})
+                        logger.info("Register success sent to Pi %s:%s", client_ip, client_port)
                     elif message_type == "status":
-                        logger.info(f"处理树莓派 {client_ip}:{client_port} 的状态消息")
                         await handle_status_message(data)
                         await router.route_message("robot", data)
+                    elif message_type == "camera_frame":
+                        await _handle_camera_frame(data, client_ip, client_port)
                     elif message_type == "webrtc_signaling":
-                        logger.info(f"处理树莓派 {client_ip}:{client_port} 的 WebRTC 信令消息")
                         await handle_webrtc_signaling_message(data)
                         await router.route_message("robot", data)
                     else:
-                        logger.warning(f"收到树莓派 {client_ip}:{client_port} 的未知消息类型: {message_type}")
-                except Exception as e:
-                    logger.error(f"处理树莓派 {client_ip}:{client_port} 消息时出错: {str(e)}")
-                    error_msg = ErrorMessage(
-                        type="error",
-                        message=f"消息格式非法: {str(e)}"
+                        logger.warning(
+                            "Unknown Pi message type from %s:%s -> %s",
+                            client_ip,
+                            client_port,
+                            message_type,
+                        )
+                except Exception as exc:
+                    logger.error("Pi message handling error from %s:%s: %s", client_ip, client_port, exc)
+                    await manager.send_to_pi(
+                        ErrorMessage(type="error", message=f"Invalid message: {exc}").model_dump()
                     )
-                    await manager.send_to_pi(error_msg.model_dump())
             except asyncio.TimeoutError:
-                # 超时后继续循环，保持连接活跃
-                logger.debug(f"树莓派 {client_ip}:{client_port} 消息接收超时，保持连接活跃")
-                pass
+                logger.debug("Pi receive timeout for %s:%s, keep alive", client_ip, client_port)
+                continue
     except WebSocketDisconnect:
-        logger.info(f"树莓派 {client_ip}:{client_port} 连接断开")
+        logger.info("Pi disconnected: %s:%s", client_ip, client_port)
         manager.disconnect(websocket)
-    except Exception as e:
-        # 妥善处理错误，避免因小错误而关闭连接
-        logger.error(f"树莓派 {client_ip}:{client_port} 连接处理时出错: {str(e)}")
+    except Exception as exc:
+        logger.error("Pi connection error %s:%s: %s", client_ip, client_port, exc)
         try:
-            error_msg = ErrorMessage(
-                type="error",
-                message=f"处理消息时出错: {str(e)}"
+            await manager.send_to_pi(
+                ErrorMessage(type="error", message=f"Connection error: {exc}").model_dump()
             )
-            await manager.send_to_pi(error_msg.model_dump())
-        except:
+        except Exception:
             pass
         finally:
             manager.disconnect(websocket)
+
+
+async def _handle_camera_frame(data: dict, client_ip: str, client_port: int):
+    payload = data.get("payload") or {}
+    frame_b64 = payload.get("data")
+    if not frame_b64:
+        logger.debug("Empty camera frame payload from %s:%s", client_ip, client_port)
+        return
+
+    try:
+        frame_bytes = base64.b64decode(frame_b64, validate=True)
+    except (binascii.Error, ValueError):
+        logger.warning("Invalid base64 camera frame from %s:%s", client_ip, client_port)
+        return
+
+    await video_hub.publish_frame(frame_bytes)

@@ -1,0 +1,8 @@
+httpx
+numpy
+onnxruntime
+openwakeword
+pillow
+piper-tts
+sounddevice
+websockets

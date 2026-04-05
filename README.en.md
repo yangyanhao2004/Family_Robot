@@ -1,36 +1,21 @@
-# graduation_project
+# graduation_project2
 
-#### Description
-为解决上班族工作时间担心独居老人或独自在家的儿童出现安全问题，本项目实现了一个可远程通信及移动控制的机器人，方便上班族随时查看家庭情况与家庭成员进行沟通。
+Family service robot graduation project, split into four modules:
 
-#### Software Architecture
-Software architecture description
+- `Family_Robot_Back_PC`: backend services and WebSocket/message routing
+- `Family_Robot_Web_PC`: browser-based control panel
+- `Family_Robot_pi`: Raspberry Pi runtime (voice + remote control)
+- `Family_Robot_STM32`: embedded firmware layer
 
-#### Installation
+## Pi-Side Integration
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+`Family_Robot_pi` now includes:
 
-#### Instructions
+- local voice assistant runtime (wake word, STT, routing, TTS)
+- remote WebSocket robot client for command + status exchange
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+Use `Family_Robot_pi/main.py` as the default launcher.
 
-#### Contribution
-
-1.  Fork the repository
-2.  Create Feat_xxx branch
-3.  Commit your code
-4.  Create Pull Request
-
-
-#### Gitee Feature
-
-1.  You can use Readme\_XXX.md to support different languages, such as Readme\_en.md, Readme\_zh.md
-2.  Gitee blog [blog.gitee.com](https://blog.gitee.com)
-3.  Explore open source project [https://gitee.com/explore](https://gitee.com/explore)
-4.  The most valuable open source project [GVP](https://gitee.com/gvp)
-5.  The manual of Gitee [https://gitee.com/help](https://gitee.com/help)
-6.  The most popular members  [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+```bash
+python main.py --mode all
+```

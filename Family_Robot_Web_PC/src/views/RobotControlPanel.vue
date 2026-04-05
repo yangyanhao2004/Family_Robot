@@ -21,6 +21,9 @@ const pressTimers = {
 // 长按时间间隔（毫秒）
 const PRESS_INTERVAL = 100;
 
+const backendHttpBase = import.meta.env.VITE_BACKEND_HTTP_URL || 'http://localhost:8080';
+const videoStreamUrl = `${backendHttpBase}/video/stream`;
+
 
 
 /* ===========================
@@ -179,9 +182,9 @@ onUnmounted(() => {
           <!-- 视频容器 -->
           <div class="video-container">
             <!-- 视频流组件 -->
-            <VideoStream 
-              streamUrl="https://samplelib.com/lib/preview/mp4/sample-5s.mp4" 
-              streamType="http"
+            <VideoStream
+              :stream-url="isConnected ? videoStreamUrl : ''"
+              stream-type="mjpeg"
               autoplay
               muted
             />
