@@ -18,3 +18,9 @@ VITE_BACKEND_HTTP_URL=http://<backend-ip>:8080
 ```
 
 The MJPEG live stream is loaded from `${VITE_BACKEND_HTTP_URL}/video/stream`.
+
+## Two-way Voice Call Notes
+
+- Browser must grant microphone permission.
+- Keep the control page open on `http://localhost:5173` (or a trusted HTTPS host).
+- Pi side needs `aiortc` installed to answer WebRTC offers.

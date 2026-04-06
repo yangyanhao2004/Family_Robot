@@ -8,6 +8,7 @@ import websockets
 from websockets.exceptions import ConnectionClosed
 
 from .robot import SUPPORTED_COMMANDS, RobotController
+from .webrtc_call import PiWebRTCCallBridge
 from senses.camera_streamer import CameraStreamer
 
 
@@ -92,6 +93,7 @@ class PiWebSocketClient:
         self._session_control_handler = session_control_handler
         self.force_local_on_backend_disconnect = force_local_on_backend_disconnect
         self.ws_open_timeout = max(2.0, float(ws_open_timeout))
+        self._webrtc_call_bridge = PiWebRTCCallBridge()
 
         if self.camera_enabled and self.camera_streamer is None:
             self.camera_streamer = CameraStreamer(
@@ -119,7 +121,7 @@ class PiWebSocketClient:
         await websocket.send(json.dumps(status_message))
         logger.debug("Sent status message: %s", status_message)
 
-    async def handle_message(self, message: str):
+    async def handle_message(self, websocket, message: str):
         try:
             data = json.loads(message)
         except json.JSONDecodeError:
@@ -145,6 +147,12 @@ class PiWebSocketClient:
             self._set_remote_session_active(
                 bool(payload.get("remote_active", False)),
                 source="backend",
+            )
+        elif message_type == "webrtc_signaling":
+            signaling_data = data.get("data") or {}
+            await self._webrtc_call_bridge.handle_signaling(
+                signaling_data=signaling_data,
+                send_json=lambda payload: self._send_json(websocket, payload),
             )
         elif message_type == "error":
             logger.error("Backend error: %s", data.get("message", "Unknown error"))
@@ -192,6 +200,9 @@ class PiWebSocketClient:
             except Exception as exc:
                 logger.error("Status send failed: %s", exc)
                 await asyncio.sleep(self.status_interval)
+
+    async def _send_json(self, websocket, payload: dict):
+        await websocket.send(json.dumps(payload))
 
     async def _camera_sender(self, websocket):
         if not self.camera_enabled or self.camera_streamer is None:
@@ -249,7 +260,7 @@ class PiWebSocketClient:
                 async for message in websocket:
                     if not self._running:
                         break
-                    await self.handle_message(message)
+                    await self.handle_message(websocket, message)
             finally:
                 status_task.cancel()
                 if camera_task:
@@ -263,6 +274,7 @@ class PiWebSocketClient:
                         await camera_task
                     except asyncio.CancelledError:
                         pass
+                await self._webrtc_call_bridge.close()
                 self._handle_backend_disconnected()
 
     async def run_forever(self):

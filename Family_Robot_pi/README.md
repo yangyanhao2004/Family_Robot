@@ -29,6 +29,12 @@ sudo apt install -y python3-picamera2
 pip install Pillow
 ```
 
+For two-way web voice call (WebRTC), install:
+
+```bash
+pip install aiortc
+```
+
 Unified launcher:
 
 ```bash
@@ -75,6 +81,10 @@ python orchestrator.py
 - `FAMILY_ROBOT_CAMERA_HEIGHT` (default: `360`)
 - `FAMILY_ROBOT_CAMERA_FPS` (default: `10`)
 - `FAMILY_ROBOT_CAMERA_JPEG_QUALITY` (default: `70`)
+- `FAMILY_ROBOT_WEBRTC_MIC_FORMAT` (default: `alsa`)
+- `FAMILY_ROBOT_WEBRTC_MIC_SOURCE` (default: `default`)
+- `FAMILY_ROBOT_WEBRTC_SPK_FORMAT` (default: `alsa`)
+- `FAMILY_ROBOT_WEBRTC_SPK_TARGET` (default: `default`)
 
 `main.py` now bootstraps `.env` for all modes (`all` / `voice` / `remote`), so
 `FAMILY_ROBOT_WS_URL` in `.env` works without exporting variables manually.

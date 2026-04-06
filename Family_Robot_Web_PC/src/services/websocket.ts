@@ -1,14 +1,5 @@
-// src/services/websocket.ts
-// WebSocket 通信服务（毕业设计工程最终版）
-// 兼容：Vue 3 + Vite 5 + Node 18
-
 import { useRobotStore } from '../store/robotStore';
 
-/* ===========================
-   类型定义
-=========================== */
-
-// 机器人控制指令
 export type RobotCommand =
   | 'forward'
   | 'backward'
@@ -18,207 +9,174 @@ export type RobotCommand =
   | 'light_on'
   | 'light_off';
 
-// 后端消息格式（可扩展）
-interface WebSocketMessage {
-  type: 'command' | 'status' | 'error' | 'success' | 'register' | 'register_success' | 'heartbeat';
+export type WebRTCSignalType = 'offer' | 'answer' | 'candidate';
+
+export interface WebRTCSignalPayload {
+  type: WebRTCSignalType;
+  offer?: RTCSessionDescriptionInit;
+  answer?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
+}
+
+export interface WebSocketMessage {
+  type: string;
   payload?: any;
+  data?: any;
   message?: string;
   role?: string;
 }
 
-/* ===========================
-   WebSocket Service
-=========================== */
+type MessageListener = (msg: WebSocketMessage) => void;
 
 class WebSocketService {
   private socket: WebSocket | null = null;
   private url: string;
 
-  // 重连控制
   private reconnectCount = 0;
   private readonly maxReconnect = 5;
   private readonly reconnectDelay = 1500;
   private manualClose = false;
 
-  // 注册状态
   private isRegistered = false;
-
-  // 心跳控制
   private heartbeatInterval: number | null = null;
-  private readonly HEARTBEAT_INTERVAL = 30000; // 30秒
+  private readonly HEARTBEAT_INTERVAL = 30000;
+
+  private listeners = new Set<MessageListener>();
 
   constructor(url = 'ws://localhost:8080/ws') {
     this.url = url;
   }
 
-  /* ===========================
-     连接管理
-  =========================== */
-
   connect(customUrl?: string): void {
     if (customUrl) this.url = customUrl;
-
     if (this.socket) return;
 
     this.manualClose = false;
     const store = useRobotStore();
 
     try {
-      console.log('[WebSocket] connecting to:', this.url);
       this.socket = new WebSocket(this.url);
 
       this.socket.onopen = () => {
         this.reconnectCount = 0;
         this.isRegistered = false;
         store.updateConnectionStatus(true, null);
-        console.log('[WebSocket] connected');
-        
-        // 连接建立后立即发送注册消息
-        const registerMsg = JSON.stringify({
-          type: 'register',
-          role: 'web'
-        });
-        console.log('[WebSocket] sending register message:', registerMsg);
-        if (this.socket) {
-          this.socket.send(registerMsg);
-        }
-        
-        // 启动心跳
+        this.sendRaw({ type: 'register', role: 'web' });
         this.startHeartbeat();
       };
 
       this.socket.onmessage = (event) => {
-        console.log('[WebSocket] received message:', event.data);
         this.handleMessage(event.data);
       };
 
-      this.socket.onerror = (error) => {
-        console.error('[WebSocket] error:', error);
-        store.updateConnectionStatus(false, 'WebSocket 连接错误');
+      this.socket.onerror = () => {
+        store.updateConnectionStatus(false, 'WebSocket connection error');
       };
 
       this.socket.onclose = (event) => {
-        console.log('[WebSocket] connection closed:', event.code, event.reason);
-        store.updateConnectionStatus(false, `连接已断开 (${event.code}: ${event.reason})`);
+        store.updateConnectionStatus(false, `Disconnected (${event.code}: ${event.reason})`);
         this.socket = null;
-        
-        // 清除心跳
+        this.isRegistered = false;
         if (this.heartbeatInterval) {
           clearInterval(this.heartbeatInterval);
           this.heartbeatInterval = null;
         }
-
         if (!this.manualClose) {
-          console.log('[WebSocket] attempting to reconnect...');
           this.attemptReconnect();
         }
       };
-    } catch (err) {
-      console.error('[WebSocket] connection failed:', err);
-      store.updateConnectionStatus(false, 'WebSocket 初始化失败');
+    } catch {
+      store.updateConnectionStatus(false, 'WebSocket initialization failed');
     }
   }
 
   disconnect(): void {
     this.manualClose = true;
-
     if (this.socket) {
       this.socket.close();
       this.socket = null;
     }
-
-    // 清除心跳
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
     }
-
-    const store = useRobotStore();
-    store.updateConnectionStatus(false, '已手动断开');
+    this.isRegistered = false;
+    useRobotStore().updateConnectionStatus(false, 'Disconnected manually');
   }
 
   isConnected(): boolean {
     return this.socket?.readyState === WebSocket.OPEN;
   }
 
-  /* ===========================
-     指令发送
-  =========================== */
-
-  sendCommand(command: RobotCommand): void {
-    if (!this.isConnected() || !this.socket) return;
-
-    // 确保只有在注册成功后才发送命令消息
-    if (!this.isRegistered) {
-      console.warn('[WebSocket] Not registered, cannot send command');
-      return;
-    }
-
-    const msg: WebSocketMessage = {
-      type: 'command',
-      payload: { command },
-    };
-
-    this.socket.send(JSON.stringify(msg));
+  addMessageListener(listener: MessageListener): void {
+    this.listeners.add(listener);
   }
 
-  /* ===========================
-     内部方法（⚠ 必须存在）
-  =========================== */
+  removeMessageListener(listener: MessageListener): void {
+    this.listeners.delete(listener);
+  }
 
-  // 启动心跳
+  sendCommand(command: RobotCommand): void {
+    if (!this.isConnected() || !this.isRegistered) return;
+    this.sendRaw({
+      type: 'command',
+      payload: { command },
+    });
+  }
+
+  sendWebRTCSignaling(data: WebRTCSignalPayload): void {
+    if (!this.isConnected() || !this.isRegistered) return;
+    this.sendRaw({
+      type: 'webrtc_signaling',
+      data,
+    });
+  }
+
+  private sendRaw(message: WebSocketMessage): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    this.socket.send(JSON.stringify(message));
+  }
+
   private startHeartbeat(): void {
-    console.log('[WebSocket] starting heartbeat');
     this.heartbeatInterval = window.setInterval(() => {
-      if (this.isConnected() && this.socket) {
-        const heartbeatMsg = JSON.stringify({ type: 'heartbeat' });
-        console.log('[WebSocket] sending heartbeat:', heartbeatMsg);
-        this.socket.send(heartbeatMsg);
+      if (this.isConnected()) {
+        this.sendRaw({ type: 'heartbeat' });
       }
     }, this.HEARTBEAT_INTERVAL);
   }
 
-  // ✅ 修复：handleMessage 不存在
   private handleMessage(raw: string): void {
     const store = useRobotStore();
-
+    let data: WebSocketMessage;
     try {
-      const data = JSON.parse(raw);
-
-      // 处理注册成功响应
-      if (data.type === 'register_success') {
-        this.isRegistered = true;
-        console.log('[WebSocket] 注册成功');
-      }
-
-      if (data.type === 'status' && data.payload) {
-        store.updateRobotStatus(data.payload);
-      }
-
-      if (data.type === 'error') {
-        store.updateConnectionStatus(false, data.message || '后端错误');
-      }
+      data = JSON.parse(raw);
     } catch {
-      console.warn('[WebSocket] 非 JSON 消息:', raw);
+      return;
     }
+
+    if (data.type === 'register_success') {
+      this.isRegistered = true;
+    } else if (data.type === 'status' && data.payload) {
+      store.updateRobotStatus(data.payload);
+    } else if (data.type === 'error') {
+      store.updateConnectionStatus(false, data.message || 'Backend error');
+    }
+
+    this.listeners.forEach((listener) => {
+      try {
+        listener(data);
+      } catch {
+        // Listener failures must not break socket processing.
+      }
+    });
   }
 
-  // ✅ 修复：attemptReconnect 不存在
   private attemptReconnect(): void {
     if (this.reconnectCount >= this.maxReconnect) return;
-
     this.reconnectCount++;
-    console.log(`[WebSocket] 重连中 (${this.reconnectCount})`);
-
-    setTimeout(() => {
-      this.connect();
-    }, this.reconnectDelay);
+    setTimeout(() => this.connect(), this.reconnectDelay);
   }
 }
-
-/* ===========================
-   单例导出
-=========================== */
 
 const webSocketService = new WebSocketService();
 export default webSocketService;

@@ -51,6 +51,7 @@ ok "Virtual environment ready ($VENV_DIR)"
 
 info "Installing Python packages..."
 pip install -q \
+  aiortc \
   httpx \
   sounddevice \
   numpy \

@@ -1,3 +1,4 @@
+aiortc
 httpx
 numpy
 onnxruntime
