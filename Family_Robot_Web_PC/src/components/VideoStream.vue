@@ -107,17 +107,8 @@ onUnmounted(() => {
 
 <template>
   <div class="video-stream-container" :style="{ width: props.width, height: props.height }">
-    <div v-if="isLoading" class="stream-loading">
-      <p>Waiting for camera stream...</p>
-    </div>
-
-    <div v-else-if="errorMessage" class="stream-error">
-      <div class="error-icon">!</div>
-      <p>{{ errorMessage }}</p>
-    </div>
-
     <img
-      v-else-if="streamType === 'mjpeg'"
+      v-if="streamType === 'mjpeg'"
       ref="imgElement"
       class="video-stream"
       alt="MJPEG stream"
@@ -136,6 +127,15 @@ onUnmounted(() => {
 
     <div v-else class="stream-placeholder">
       <p>WebRTC placeholder</p>
+    </div>
+
+    <div v-if="isLoading" class="stream-loading">
+      <p>Waiting for camera stream...</p>
+    </div>
+
+    <div v-if="errorMessage" class="stream-error">
+      <div class="error-icon">!</div>
+      <p>{{ errorMessage }}</p>
     </div>
   </div>
 </template>

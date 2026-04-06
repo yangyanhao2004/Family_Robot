@@ -136,21 +136,25 @@ async def websocket_route(websocket: WebSocket):
 async def video_stream():
     async def mjpeg_generator():
         last_seq = 0
-        while True:
-            frame_item = await video_hub.wait_next_frame(last_seq)
-            if frame_item is None:
-                # No frame yet (or camera paused), keep waiting.
-                continue
+        try:
+            while True:
+                frame_item = await video_hub.wait_next_frame(last_seq)
+                if frame_item is None:
+                    # No frame yet (or camera paused), keep waiting.
+                    continue
 
-            last_seq, jpeg_bytes = frame_item
-            header = (
-                b"--frame\r\n"
-                b"Content-Type: image/jpeg\r\n"
-                b"Cache-Control: no-cache\r\n"
-                b"Pragma: no-cache\r\n"
-                + f"Content-Length: {len(jpeg_bytes)}\r\n\r\n".encode("ascii")
-            )
-            yield header + jpeg_bytes + b"\r\n"
+                last_seq, jpeg_bytes = frame_item
+                header = (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n"
+                    b"Cache-Control: no-cache\r\n"
+                    b"Pragma: no-cache\r\n"
+                    + f"Content-Length: {len(jpeg_bytes)}\r\n\r\n".encode("ascii")
+                )
+                yield header + jpeg_bytes + b"\r\n"
+        except asyncio.CancelledError:
+            # Expected when client disconnects or request times out.
+            return
 
     return StreamingResponse(
         mjpeg_generator(),

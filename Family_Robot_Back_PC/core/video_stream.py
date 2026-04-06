@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import threading
+import time
 from typing import Optional, Tuple
 
 
@@ -11,7 +13,7 @@ class VideoStreamHub:
 
     def __init__(self, max_frame_bytes: int = 2_000_000):
         self.max_frame_bytes = max_frame_bytes
-        self._condition = asyncio.Condition()
+        self._lock = threading.Lock()
         self._latest_seq = 0
         self._latest_frame: Optional[bytes] = None
 
@@ -27,27 +29,24 @@ class VideoStreamHub:
             )
             return
 
-        async with self._condition:
+        with self._lock:
             self._latest_frame = frame_bytes
             self._latest_seq += 1
-            self._condition.notify_all()
 
     async def wait_next_frame(
         self,
         last_seq: int,
         timeout_seconds: float = 20.0,
     ) -> Optional[Tuple[int, bytes]]:
-        try:
-            async with self._condition:
-                await asyncio.wait_for(
-                    self._condition.wait_for(
-                        lambda: self._latest_frame is not None and self._latest_seq > last_seq
-                    ),
-                    timeout=timeout_seconds,
-                )
-                return self._latest_seq, self._latest_frame
-        except asyncio.TimeoutError:
-            return None
+        # Poll with a short sleep to avoid loop-bound primitives that may break
+        # when uvicorn serves requests on a different event loop instance.
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            with self._lock:
+                if self._latest_frame is not None and self._latest_seq > last_seq:
+                    return self._latest_seq, self._latest_frame
+            await asyncio.sleep(0.03)
+        return None
 
 
 video_hub = VideoStreamHub()
