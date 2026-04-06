@@ -74,6 +74,8 @@ class PiWebSocketClient:
         camera_jpeg_quality: int = 70,
         camera_streamer: Optional[CameraStreamer] = None,
         session_control_handler: Optional[Callable[[bool], None]] = None,
+        force_local_on_backend_disconnect: bool = True,
+        ws_open_timeout: float = 8.0,
     ):
         self.ws_url = ws_url or _build_ws_url()
         self.reconnect_interval = reconnect_interval
@@ -88,6 +90,8 @@ class PiWebSocketClient:
         self._camera_started = False
         self._remote_session_active = False
         self._session_control_handler = session_control_handler
+        self.force_local_on_backend_disconnect = force_local_on_backend_disconnect
+        self.ws_open_timeout = max(2.0, float(ws_open_timeout))
 
         if self.camera_enabled and self.camera_streamer is None:
             self.camera_streamer = CameraStreamer(
@@ -138,11 +142,10 @@ class PiWebSocketClient:
             logger.info("Register acknowledged by backend")
         elif message_type == "session_control":
             payload = data.get("payload") or {}
-            remote_active = bool(payload.get("remote_active", False))
-            if remote_active != self._remote_session_active:
-                self._remote_session_active = remote_active
-                logger.info("Remote session state updated: active=%s", remote_active)
-                self._notify_session_control(remote_active)
+            self._set_remote_session_active(
+                bool(payload.get("remote_active", False)),
+                source="backend",
+            )
         elif message_type == "error":
             logger.error("Backend error: %s", data.get("message", "Unknown error"))
         else:
@@ -155,6 +158,29 @@ class PiWebSocketClient:
             self._session_control_handler(remote_active)
         except Exception as exc:
             logger.error("Session control handler failed: %s", exc)
+
+    def _set_remote_session_active(self, remote_active: bool, source: str):
+        remote_active = bool(remote_active)
+        if remote_active == self._remote_session_active:
+            return
+
+        self._remote_session_active = remote_active
+        logger.info(
+            "Remote session state updated: active=%s (source=%s)",
+            remote_active,
+            source,
+        )
+        self._notify_session_control(remote_active)
+
+    def _handle_backend_disconnected(self):
+        if not self.force_local_on_backend_disconnect:
+            return
+
+        if self._remote_session_active:
+            logger.warning(
+                "Backend disconnected while remote session was active; forcing local mode fallback"
+            )
+            self._set_remote_session_active(False, source="backend_disconnect_fallback")
 
     async def _status_sender(self, websocket):
         while self._running:
@@ -207,7 +233,12 @@ class PiWebSocketClient:
 
     async def _run_once(self):
         logger.info("Connecting to backend: %s", self.ws_url)
-        async with websockets.connect(self.ws_url) as websocket:
+        async with websockets.connect(
+            self.ws_url,
+            open_timeout=self.ws_open_timeout,
+            ping_interval=20,
+            ping_timeout=20,
+        ) as websocket:
             logger.info("Backend connection established")
             await self.send_register_message(websocket)
             status_task = asyncio.create_task(self._status_sender(websocket))
@@ -232,6 +263,7 @@ class PiWebSocketClient:
                         await camera_task
                     except asyncio.CancelledError:
                         pass
+                self._handle_backend_disconnected()
 
     async def run_forever(self):
         while self._running:
@@ -259,6 +291,10 @@ async def _async_main():
         camera_height=_env_int("FAMILY_ROBOT_CAMERA_HEIGHT", 360),
         camera_fps=_env_int("FAMILY_ROBOT_CAMERA_FPS", 10),
         camera_jpeg_quality=_env_int("FAMILY_ROBOT_CAMERA_JPEG_QUALITY", 70),
+        force_local_on_backend_disconnect=_env_bool(
+            "FAMILY_ROBOT_FORCE_LOCAL_ON_BACKEND_DISCONNECT", True
+        ),
+        ws_open_timeout=_env_float("FAMILY_ROBOT_WS_OPEN_TIMEOUT", 8.0),
     )
     await client.run_forever()
 

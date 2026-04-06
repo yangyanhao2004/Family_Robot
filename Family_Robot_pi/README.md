@@ -68,6 +68,8 @@ python orchestrator.py
 - `FAMILY_ROBOT_BACKEND_PATH` (default: `/ws`)
 - `FAMILY_ROBOT_STATUS_INTERVAL` (default: `2.0`)
 - `FAMILY_ROBOT_RECONNECT_INTERVAL` (default: `3.0`)
+- `FAMILY_ROBOT_WS_OPEN_TIMEOUT` (default: `8.0`)
+- `FAMILY_ROBOT_FORCE_LOCAL_ON_BACKEND_DISCONNECT` (default: `true`)
 - `FAMILY_ROBOT_CAMERA_ENABLED` (default: `true`)
 - `FAMILY_ROBOT_CAMERA_WIDTH` (default: `640`)
 - `FAMILY_ROBOT_CAMERA_HEIGHT` (default: `360`)
@@ -84,3 +86,5 @@ python orchestrator.py
 - In `--mode all`, Pi now listens for backend `session_control` messages:
   - `remote_active=true`: pause local emotional chat (wake word + local TTS replies)
   - `remote_active=false`: resume local emotional chat
+- Safety fallback: if backend disconnects unexpectedly while remote session is active,
+  Pi forces local emotional chat to resume by default.
