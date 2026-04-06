@@ -10,7 +10,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from typing import Awaitable, Callable, Dict, Optional
+import re
+import subprocess
+from typing import Awaitable, Callable, Dict, Iterable, Optional
 
 try:
     from aiortc import RTCPeerConnection, RTCSessionDescription
@@ -30,6 +32,59 @@ except Exception:  # pragma: no cover - optional dependency
 logger = logging.getLogger("interaction.webrtc_call")
 
 SendJson = Callable[[Dict], Awaitable[None]]
+
+DEFAULT_WEBRTC_MIC_DEVICE_NAME = "USB PnP Sound Device"
+DEFAULT_WEBRTC_SPK_DEVICE_NAME = "bcm2835 Headphones"
+_ALSA_CARD_DEVICE_RE = re.compile(
+    r"^card\s+(\d+):.*?,\s*device\s+(\d+):",
+    re.IGNORECASE,
+)
+
+
+def _dedupe(values: Iterable[str]):
+    seen = set()
+    for value in values:
+        normalized = (value or "").strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        yield normalized
+
+
+def _run_command_lines(command: list[str]):
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except Exception:
+        return []
+    return result.stdout.splitlines()
+
+
+def _find_alsa_card_device(command: list[str], name_substring: str) -> Optional[str]:
+    target = (name_substring or "").strip().lower()
+    if not target:
+        return None
+
+    for line in _run_command_lines(command):
+        line_lower = line.lower()
+        if not line_lower.startswith("card "):
+            continue
+        if target not in line_lower:
+            continue
+
+        match = _ALSA_CARD_DEVICE_RE.search(line)
+        if match:
+            return "plughw:{},{}".format(match.group(1), match.group(2))
+
+        card_part = line.split(":", 1)[0].replace("card", "").strip()
+        if card_part.isdigit():
+            return "plughw:{},0".format(card_part)
+
+    return None
 
 
 class PiWebRTCCallBridge:
@@ -199,30 +254,92 @@ class PiWebRTCCallBridge:
         if not AIORTC_AVAILABLE:
             return None
 
-        source = os.getenv("FAMILY_ROBOT_WEBRTC_MIC_SOURCE", "default")
+        explicit_source = os.getenv("FAMILY_ROBOT_WEBRTC_MIC_SOURCE", "")
+        device_name = os.getenv(
+            "FAMILY_ROBOT_WEBRTC_MIC_DEVICE_NAME",
+            DEFAULT_WEBRTC_MIC_DEVICE_NAME,
+        )
+        auto_source = _find_alsa_card_device(["arecord", "-l"], device_name)
+
         fmt = os.getenv("FAMILY_ROBOT_WEBRTC_MIC_FORMAT", "alsa")
         options = {
             "channels": os.getenv("FAMILY_ROBOT_WEBRTC_MIC_CHANNELS", "1"),
             "sample_rate": os.getenv("FAMILY_ROBOT_WEBRTC_MIC_SAMPLE_RATE", "48000"),
         }
-        try:
-            return MediaPlayer(source, format=fmt, options=options)
-        except Exception as exc:
-            logger.warning("Failed to create Pi WebRTC microphone input: %s", exc)
-            return None
+        prefer_explicit = explicit_source.strip().lower() not in {"", "default", "auto"}
+        ordered = (
+            [explicit_source, auto_source or ""]
+            if prefer_explicit
+            else [auto_source or "", explicit_source]
+        )
+        candidates = list(
+            _dedupe(
+                ordered
+                + [
+                    "plughw:1,0",
+                    "hw:1,0",
+                    "default",
+                ]
+            )
+        )
+
+        for source in candidates:
+            try:
+                player = MediaPlayer(source, format=fmt, options=options)
+                logger.info("Using Pi WebRTC microphone source: %s", source)
+                return player
+            except Exception as exc:
+                logger.warning(
+                    "Failed to create Pi WebRTC microphone input source=%s: %s",
+                    source,
+                    exc,
+                )
+
+        return None
 
     def _create_speaker_recorder(self):
         if not AIORTC_AVAILABLE:
             return None
 
-        target = os.getenv("FAMILY_ROBOT_WEBRTC_SPK_TARGET", "default")
+        explicit_target = os.getenv("FAMILY_ROBOT_WEBRTC_SPK_TARGET", "")
+        device_name = os.getenv(
+            "FAMILY_ROBOT_WEBRTC_SPK_DEVICE_NAME",
+            DEFAULT_WEBRTC_SPK_DEVICE_NAME,
+        )
+        auto_target = _find_alsa_card_device(["aplay", "-l"], device_name)
+
         fmt = os.getenv("FAMILY_ROBOT_WEBRTC_SPK_FORMAT", "alsa")
         options = {
             "channels": os.getenv("FAMILY_ROBOT_WEBRTC_SPK_CHANNELS", "1"),
             "sample_rate": os.getenv("FAMILY_ROBOT_WEBRTC_SPK_SAMPLE_RATE", "48000"),
         }
-        try:
-            return MediaRecorder(target, format=fmt, options=options)
-        except Exception as exc:
-            logger.warning("Failed to create Pi WebRTC speaker output: %s", exc)
-            return None
+        prefer_explicit = explicit_target.strip().lower() not in {"", "default", "auto"}
+        ordered = (
+            [explicit_target, auto_target or ""]
+            if prefer_explicit
+            else [auto_target or "", explicit_target]
+        )
+        candidates = list(
+            _dedupe(
+                ordered
+                + [
+                    "plughw:0,0",
+                    "hw:0,0",
+                    "default",
+                ]
+            )
+        )
+
+        for target in candidates:
+            try:
+                recorder = MediaRecorder(target, format=fmt, options=options)
+                logger.info("Using Pi WebRTC speaker target: %s", target)
+                return recorder
+            except Exception as exc:
+                logger.warning(
+                    "Failed to create Pi WebRTC speaker output target=%s: %s",
+                    target,
+                    exc,
+                )
+
+        return None

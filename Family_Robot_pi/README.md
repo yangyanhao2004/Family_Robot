@@ -83,8 +83,14 @@ python orchestrator.py
 - `FAMILY_ROBOT_CAMERA_JPEG_QUALITY` (default: `70`)
 - `FAMILY_ROBOT_WEBRTC_MIC_FORMAT` (default: `alsa`)
 - `FAMILY_ROBOT_WEBRTC_MIC_SOURCE` (default: `default`)
+- `FAMILY_ROBOT_WEBRTC_MIC_DEVICE_NAME` (default: `USB PnP Sound Device`)
 - `FAMILY_ROBOT_WEBRTC_SPK_FORMAT` (default: `alsa`)
 - `FAMILY_ROBOT_WEBRTC_SPK_TARGET` (default: `default`)
+- `FAMILY_ROBOT_WEBRTC_SPK_DEVICE_NAME` (default: `bcm2835 Headphones`)
+
+For WebRTC audio, Pi now auto-resolves ALSA devices from `arecord -l` / `aplay -l`
+using `*_DEVICE_NAME` first, then falls back to common `plughw:*` and `default`.
+So in most cases, `python main.py` works without manually editing device paths.
 
 `main.py` now bootstraps `.env` for all modes (`all` / `voice` / `remote`), so
 `FAMILY_ROBOT_WS_URL` in `.env` works without exporting variables manually.
