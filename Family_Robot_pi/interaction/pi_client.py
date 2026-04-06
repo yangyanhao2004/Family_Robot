@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Optional
+from typing import Callable, Optional
 
 import websockets
 from websockets.exceptions import ConnectionClosed
@@ -73,6 +73,7 @@ class PiWebSocketClient:
         camera_fps: int = 10,
         camera_jpeg_quality: int = 70,
         camera_streamer: Optional[CameraStreamer] = None,
+        session_control_handler: Optional[Callable[[bool], None]] = None,
     ):
         self.ws_url = ws_url or _build_ws_url()
         self.reconnect_interval = reconnect_interval
@@ -85,6 +86,8 @@ class PiWebSocketClient:
         self._camera_send_interval = 1.0 / float(self.camera_fps)
         self.camera_streamer = camera_streamer
         self._camera_started = False
+        self._remote_session_active = False
+        self._session_control_handler = session_control_handler
 
         if self.camera_enabled and self.camera_streamer is None:
             self.camera_streamer = CameraStreamer(
@@ -133,10 +136,25 @@ class PiWebSocketClient:
                 )
         elif message_type == "register_success":
             logger.info("Register acknowledged by backend")
+        elif message_type == "session_control":
+            payload = data.get("payload") or {}
+            remote_active = bool(payload.get("remote_active", False))
+            if remote_active != self._remote_session_active:
+                self._remote_session_active = remote_active
+                logger.info("Remote session state updated: active=%s", remote_active)
+                self._notify_session_control(remote_active)
         elif message_type == "error":
             logger.error("Backend error: %s", data.get("message", "Unknown error"))
         else:
             logger.debug("Received message type: %s", message_type)
+
+    def _notify_session_control(self, remote_active: bool):
+        if self._session_control_handler is None:
+            return
+        try:
+            self._session_control_handler(remote_active)
+        except Exception as exc:
+            logger.error("Session control handler failed: %s", exc)
 
     async def _status_sender(self, websocket):
         while self._running:

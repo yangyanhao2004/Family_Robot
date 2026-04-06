@@ -9,6 +9,7 @@ import signal
 import time
 import random
 from pathlib import Path
+from threading import Lock
 from typing import Callable, TypeVar
 
 # Add project root to path
@@ -47,6 +48,10 @@ class Orchestrator:
     def __init__(self, config: Config):
         self.config = config
         self._running = False
+        self._state_lock = Lock()
+        self._remote_session_active = False
+        self._interaction_suspended = False
+        self._wake_word_started = False
 
         # Initialize components
         print("Initializing Jarvis...")
@@ -182,6 +187,13 @@ class Orchestrator:
 
         # Start wake word detection after greeting finishes
         self.wake_word.start(callback=self._on_wake_word)
+        with self._state_lock:
+            self._wake_word_started = True
+
+        # If a remote session was already active before startup completed,
+        # suspend local emotional chat immediately.
+        if self.is_remote_session_active():
+            self._suspend_emotional_chat("startup")
 
         print("Jarvis is running. Say 'Hey Jarvis' to activate.")
         print("Press Ctrl+C to exit.")
@@ -203,8 +215,61 @@ class Orchestrator:
         """Stop the assistant loop."""
         self._running = False
 
+    def is_remote_session_active(self) -> bool:
+        with self._state_lock:
+            return self._remote_session_active
+
+    def set_remote_session_active(self, active: bool):
+        active = bool(active)
+        with self._state_lock:
+            if self._remote_session_active == active:
+                return
+            self._remote_session_active = active
+
+        if active:
+            self._suspend_emotional_chat("remote_session")
+        else:
+            self._resume_emotional_chat("remote_session")
+
+    def _suspend_emotional_chat(self, reason: str):
+        with self._state_lock:
+            if self._interaction_suspended:
+                return
+            self._interaction_suspended = True
+            wake_word_started = self._wake_word_started
+
+        print(f"[session] Emotional chat paused ({reason})")
+        if wake_word_started:
+            self.wake_word.pause()
+
+    def _resume_emotional_chat(self, reason: str):
+        with self._state_lock:
+            if not self._interaction_suspended:
+                return
+            if self._remote_session_active:
+                return
+            self._interaction_suspended = False
+            wake_word_started = self._wake_word_started
+
+        print(f"[session] Emotional chat resumed ({reason})")
+        if wake_word_started:
+            self.wake_word.resume()
+
+    def _resume_wake_word_if_allowed(self):
+        with self._state_lock:
+            allow = (
+                self._running
+                and not self._remote_session_active
+                and not self._interaction_suspended
+                and self._wake_word_started
+            )
+        if allow:
+            self.wake_word.resume()
+
     def _cleanup(self):
         """Clean up resources."""
+        with self._state_lock:
+            self._wake_word_started = False
         self.wake_word.stop()
 
     def _timed(self, label: str, func: Callable[[], T]) -> T:
@@ -219,6 +284,10 @@ class Orchestrator:
     def _on_wake_word(self):
         """Called when wake word is detected."""
         if not self._running:
+            return
+
+        if self.is_remote_session_active():
+            print("[session] Wake word ignored because remote session is active")
             return
 
         print("Wake word detected!")
@@ -244,7 +313,7 @@ class Orchestrator:
 
         if audio is None or len(audio) == 0:
             print("No speech detected")
-            self.wake_word.resume()
+            self._resume_wake_word_if_allowed()
             return
 
         # Transcribe
@@ -255,12 +324,12 @@ class Orchestrator:
         except Exception as e:
             print(f"Transcription error: {e}")
             self._speak("Sorry, I didn't catch that.")
-            self.wake_word.resume()
+            self._resume_wake_word_if_allowed()
             return
 
         if not text.strip():
             self._speak("I didn't hear anything.")
-            self.wake_word.resume()
+            self._resume_wake_word_if_allowed()
             return
 
         # Speak a random filler phrase before processing when enabled.
@@ -279,7 +348,7 @@ class Orchestrator:
                 total_elapsed = time.perf_counter() - total_start
                 print("[timing] total interaction: {:.2f}s".format(total_elapsed))
 
-        self.wake_word.resume()
+        self._resume_wake_word_if_allowed()
 
     def _speak_filler(self):
         """Play a random pre-generated filler phrase."""
@@ -362,6 +431,10 @@ class Orchestrator:
     def _speak(self, text: str):
         """Speak text through TTS."""
         if not text:
+            return
+
+        if self.is_remote_session_active():
+            print("[session] Skip local TTS while remote session is active")
             return
 
         print(f"Speaking: {text}")

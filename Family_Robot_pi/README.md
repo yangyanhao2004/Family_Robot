@@ -35,6 +35,18 @@ Unified launcher:
 python main.py --mode all
 ```
 
+For a backend running on another machine, pass URL once:
+
+```bash
+python main.py --mode all --ws-url ws://<BACKEND_PC_IP>:8080/ws
+```
+
+Or set backend URL once in `.env` and then simply run:
+
+```bash
+python main.py
+```
+
 Single-subsystem modes:
 
 ```bash
@@ -62,7 +74,13 @@ python orchestrator.py
 - `FAMILY_ROBOT_CAMERA_FPS` (default: `10`)
 - `FAMILY_ROBOT_CAMERA_JPEG_QUALITY` (default: `70`)
 
+`main.py` now bootstraps `.env` for all modes (`all` / `voice` / `remote`), so
+`FAMILY_ROBOT_WS_URL` in `.env` works without exporting variables manually.
+
 ## Notes
 
 - `interaction/pi_client.py` keeps the same message protocol expected by `Family_Robot_Back_PC`.
 - `interaction/robot/controller.py` currently simulates status and command effects; replace command branches with real hardware adapters when STM32/serial control is ready.
+- In `--mode all`, Pi now listens for backend `session_control` messages:
+  - `remote_active=true`: pause local emotional chat (wake word + local TTS replies)
+  - `remote_active=false`: resume local emotional chat

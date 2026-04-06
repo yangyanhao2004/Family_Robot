@@ -11,10 +11,26 @@ Modes:
 import argparse
 import asyncio
 import logging
-from threading import Thread
+from threading import Lock, Thread
 from typing import Optional
 
 logger = logging.getLogger("family_robot_pi.main")
+
+
+def _bootstrap_runtime_env(config_path: Optional[str]):
+    """
+    Load .env/config variables once before launching any mode.
+
+    This guarantees remote-only mode can also read FAMILY_ROBOT_* variables
+    from `.env`, so users can run `python main.py` without extra CLI flags.
+    """
+    try:
+        from config import Config
+
+        # Side effect: Config.load() reads .env into process environment.
+        Config.load(config_path)
+    except Exception as exc:
+        logger.warning("Env bootstrap skipped: %s", exc)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -82,12 +98,33 @@ def _run_remote_only(args: argparse.Namespace):
 def _run_all(args: argparse.Namespace):
     from interaction.pi_client import PiWebSocketClient
 
-    shared = {"orchestrator": None}
+    shared = {
+        "orchestrator": None,
+        "pending_remote_active": None,
+    }
+    shared_lock = Lock()
+
+    def on_remote_session_change(remote_active: bool):
+        with shared_lock:
+            orchestrator = shared.get("orchestrator")
+            if orchestrator is None:
+                shared["pending_remote_active"] = remote_active
+                logger.info(
+                    "Queued remote session state before voice startup: active=%s",
+                    remote_active,
+                )
+                return
+
+        orchestrator.set_remote_session_active(remote_active)
 
     def voice_runner():
         try:
             orchestrator = _create_orchestrator(args.config)
-            shared["orchestrator"] = orchestrator
+            with shared_lock:
+                shared["orchestrator"] = orchestrator
+                pending_remote_active = shared.get("pending_remote_active")
+            if pending_remote_active is not None:
+                orchestrator.set_remote_session_active(bool(pending_remote_active))
             orchestrator.start(install_signal_handlers=False, force_exit=False)
         except Exception as exc:
             logger.exception("Voice agent terminated with error: %s", exc)
@@ -99,6 +136,7 @@ def _run_all(args: argparse.Namespace):
         ws_url=args.ws_url,
         reconnect_interval=args.reconnect_interval,
         status_interval=args.status_interval,
+        session_control_handler=on_remote_session_change,
     )
 
     try:
@@ -107,7 +145,8 @@ def _run_all(args: argparse.Namespace):
         logger.info("Combined mode interrupted")
     finally:
         remote.stop()
-        orchestrator = shared.get("orchestrator")
+        with shared_lock:
+            orchestrator = shared.get("orchestrator")
         if orchestrator is not None:
             orchestrator.stop()
         voice_thread.join(timeout=5.0)
@@ -115,6 +154,7 @@ def _run_all(args: argparse.Namespace):
 
 def main():
     args = _build_parser().parse_args()
+    _bootstrap_runtime_env(args.config)
 
     if args.mode == "voice":
         _run_voice_only(args.config)

@@ -20,6 +20,7 @@ async def websocket_pi_endpoint(websocket: WebSocket):
     client_port = websocket.client.port
     logger.info("Pi client registered: %s:%s", client_ip, client_port)
     manager.register_pi(websocket)
+    await _sync_remote_session_state_to_pi()
 
     try:
         logger.info("Start handling Pi messages from %s:%s", client_ip, client_port)
@@ -89,3 +90,15 @@ async def _handle_camera_frame(data: dict, client_ip: str, client_port: int):
         return
 
     await video_hub.publish_frame(frame_bytes)
+
+
+async def _sync_remote_session_state_to_pi():
+    """
+    Resynchronize remote-session state whenever Pi reconnects.
+    """
+    await manager.send_to_pi(
+        {
+            "type": "session_control",
+            "payload": {"remote_active": manager.is_web_connected()},
+        }
+    )
