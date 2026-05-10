@@ -1,9 +1,12 @@
 aiortc
+fastapi
 httpx
 numpy
 onnxruntime
 openwakeword
 pillow
 piper-tts
+pydantic
 sounddevice
+uvicorn
 websockets

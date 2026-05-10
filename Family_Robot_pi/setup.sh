@@ -50,16 +50,7 @@ pip install --upgrade pip -q
 ok "Virtual environment ready ($VENV_DIR)"
 
 info "Installing Python packages..."
-pip install -q \
-  aiortc \
-  httpx \
-  sounddevice \
-  numpy \
-  websockets \
-  pillow \
-  piper-tts \
-  openwakeword \
-  onnxruntime
+pip install -q -r requirements.txt
 ok "Python packages installed"
 
 if ! command -v ollama &>/dev/null; then
@@ -122,9 +113,9 @@ echo "============================================================"
 echo ""
 echo " Next steps:"
 echo "   1. (Optional) Edit .env to add API keys."
-echo "   2. Start Jarvis:"
+echo "   2. Start (backend + voice + remote control):"
 echo "        source venv313/bin/activate"
-echo "        python orchestrator.py"
+echo "        python main.py --mode all"
 echo ""
-echo ' Say "Hey Jarvis" and start talking.'
+echo ' Say "Hey Jarvis" and start talking. The backend API runs on port 8080.'
 echo ""

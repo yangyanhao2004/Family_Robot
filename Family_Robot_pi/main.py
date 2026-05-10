@@ -1,81 +1,89 @@
 #!/usr/bin/env python3
 """
-Unified launcher for Family_Robot_pi.
+Unified launcher for Family Robot Pi.
+
+Starts the FastAPI backend + voice agent + remote WebSocket client
+all from a single command on Raspberry Pi.
 
 Modes:
-- all: run voice agent + WebSocket remote client
-- voice: run voice agent only
-- remote: run WebSocket remote client only
+  --mode all     Backend + voice agent + remote client (default)
+  --mode voice   Voice agent only, no backend
+  --mode remote  Backend + remote client only, no voice agent
 """
 
 import argparse
 import asyncio
 import logging
+import time
+import urllib.request
 from threading import Lock, Thread
 from typing import Optional
 
-logger = logging.getLogger("family_robot_pi.main")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("family_robot.main")
 
 
 def _bootstrap_runtime_env(config_path: Optional[str]):
-    """
-    Load .env/config variables once before launching any mode.
-
-    This guarantees remote-only mode can also read FAMILY_ROBOT_* variables
-    from `.env`, so users can run `python main.py` without extra CLI flags.
-    """
+    """Load .env/config before launching any mode."""
     try:
         from config import Config
-
-        # Side effect: Config.load() reads .env into process environment.
         Config.load(config_path)
     except Exception as exc:
         logger.warning("Env bootstrap skipped: %s", exc)
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Family Robot Pi launcher")
+    parser = argparse.ArgumentParser(description="Family Robot Pi unified launcher")
     parser.add_argument(
-        "--mode",
-        choices=("all", "voice", "remote"),
-        default="all",
-        help="Run both voice and remote control, or only one subsystem",
+        "--mode", choices=("all", "voice", "remote"), default="all",
+        help="Run mode (default: all)",
     )
-    parser.add_argument(
-        "--config",
-        default=None,
-        help="Optional path to Pi voice-agent config JSON",
-    )
-    parser.add_argument(
-        "--ws-url",
-        default=None,
-        help="Optional backend WebSocket URL override for remote mode",
-    )
-    parser.add_argument(
-        "--status-interval",
-        type=float,
-        default=2.0,
-        help="Seconds between status pushes in remote mode",
-    )
-    parser.add_argument(
-        "--reconnect-interval",
-        type=float,
-        default=3.0,
-        help="Seconds to wait before remote reconnection attempts",
-    )
+    parser.add_argument("--config", default=None, help="Path to voice-agent config JSON")
+    parser.add_argument("--ws-url", default=None, help="Backend WebSocket URL (default: ws://127.0.0.1:8080/ws)")
+    parser.add_argument("--status-interval", type=float, default=2.0, help="Status push interval (s)")
+    parser.add_argument("--reconnect-interval", type=float, default=3.0, help="Reconnect delay (s)")
+    parser.add_argument("--backend-port", type=int, default=8080, help="Backend listen port")
+    parser.add_argument("--no-backend", action="store_true", help="Don't auto-start backend")
     return parser
 
 
-def _create_orchestrator(config_path: Optional[str]):
-    from config import Config
-    from orchestrator import Orchestrator
+def _start_backend(port: int):
+    """Start FastAPI backend in the current thread (blocking)."""
+    import uvicorn
+    from backend.app import app
 
-    config = Config.load(config_path)
-    return Orchestrator(config)
+    # Suppress uvicorn access logs unless FAMILY_ROBOT_VERBOSE is set
+    import os
+    log_level = "info" if os.getenv("FAMILY_ROBOT_VERBOSE") else "warning"
+
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level=log_level)
+
+
+def _wait_for_backend(port: int, timeout: float = 15.0):
+    """Poll the backend health endpoint until it responds."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            resp = urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1.0)
+            if resp.status == 200:
+                logger.info("Backend is ready on port %s", port)
+                return True
+        except Exception:
+            pass
+        time.sleep(0.3)
+    logger.error("Backend did not become ready within %.0f seconds", timeout)
+    return False
 
 
 def _run_voice_only(config_path: Optional[str]):
-    orchestrator = _create_orchestrator(config_path)
+    from orchestrator import Orchestrator
+    from config import Config
+
+    config = Config.load(config_path)
+    orchestrator = Orchestrator(config)
     orchestrator.start(install_signal_handlers=True, force_exit=False)
 
 
@@ -98,10 +106,7 @@ def _run_remote_only(args: argparse.Namespace):
 def _run_all(args: argparse.Namespace):
     from interaction.pi_client import PiWebSocketClient
 
-    shared = {
-        "orchestrator": None,
-        "pending_remote_active": None,
-    }
+    shared = {"orchestrator": None, "pending_remote_active": None}
     shared_lock = Lock()
 
     def on_remote_session_change(remote_active: bool):
@@ -109,25 +114,24 @@ def _run_all(args: argparse.Namespace):
             orchestrator = shared.get("orchestrator")
             if orchestrator is None:
                 shared["pending_remote_active"] = remote_active
-                logger.info(
-                    "Queued remote session state before voice startup: active=%s",
-                    remote_active,
-                )
                 return
-
         orchestrator.set_remote_session_active(remote_active)
 
     def voice_runner():
         try:
-            orchestrator = _create_orchestrator(args.config)
+            from orchestrator import Orchestrator
+            from config import Config
+
+            config = Config.load(args.config)
+            orchestrator = Orchestrator(config)
             with shared_lock:
                 shared["orchestrator"] = orchestrator
-                pending_remote_active = shared.get("pending_remote_active")
-            if pending_remote_active is not None:
-                orchestrator.set_remote_session_active(bool(pending_remote_active))
+                pending = shared.get("pending_remote_active")
+            if pending is not None:
+                orchestrator.set_remote_session_active(bool(pending))
             orchestrator.start(install_signal_handlers=False, force_exit=False)
         except Exception as exc:
-            logger.exception("Voice agent terminated with error: %s", exc)
+            logger.exception("Voice agent error: %s", exc)
 
     voice_thread = Thread(target=voice_runner, name="voice-agent", daemon=True)
     voice_thread.start()
@@ -155,6 +159,20 @@ def _run_all(args: argparse.Namespace):
 def main():
     args = _build_parser().parse_args()
     _bootstrap_runtime_env(args.config)
+
+    need_backend = args.mode in ("all", "remote") and not args.no_backend
+
+    if need_backend:
+        logger.info("Starting backend server on port %s...", args.backend_port)
+        backend_thread = Thread(
+            target=_start_backend, args=(args.backend_port,),
+            name="backend", daemon=True,
+        )
+        backend_thread.start()
+
+        if not _wait_for_backend(args.backend_port):
+            logger.error("Backend failed to start, aborting")
+            return
 
     if args.mode == "voice":
         _run_voice_only(args.config)
