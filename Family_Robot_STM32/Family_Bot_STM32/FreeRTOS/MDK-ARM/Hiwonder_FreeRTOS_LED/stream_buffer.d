@@ -1,0 +1,14 @@
+hiwonder_freertos_led\stream_buffer.o: ../Middlewares/Third_Party/FreeRTOS/Source/stream_buffer.c
+hiwonder_freertos_led\stream_buffer.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+hiwonder_freertos_led\stream_buffer.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+hiwonder_freertos_led\stream_buffer.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
+hiwonder_freertos_led\stream_buffer.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+hiwonder_freertos_led\stream_buffer.o: ../Inc/FreeRTOSConfig.h
+hiwonder_freertos_led\stream_buffer.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h
+hiwonder_freertos_led\stream_buffer.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h
+hiwonder_freertos_led\stream_buffer.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h
+hiwonder_freertos_led\stream_buffer.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
+hiwonder_freertos_led\stream_buffer.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
+hiwonder_freertos_led\stream_buffer.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h
+hiwonder_freertos_led\stream_buffer.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
+hiwonder_freertos_led\stream_buffer.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/stream_buffer.h

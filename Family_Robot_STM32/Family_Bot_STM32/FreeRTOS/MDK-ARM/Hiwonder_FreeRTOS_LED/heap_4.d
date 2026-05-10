@@ -1,0 +1,13 @@
+hiwonder_freertos_led\heap_4.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/MemMang/heap_4.c
+hiwonder_freertos_led\heap_4.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdlib.h
+hiwonder_freertos_led\heap_4.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h
+hiwonder_freertos_led\heap_4.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stddef.h
+hiwonder_freertos_led\heap_4.o: D:\Keil_v5\ARM\ARMCC\Bin\..\include\stdint.h
+hiwonder_freertos_led\heap_4.o: ../Inc/FreeRTOSConfig.h
+hiwonder_freertos_led\heap_4.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h
+hiwonder_freertos_led\heap_4.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/portable.h
+hiwonder_freertos_led\heap_4.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/deprecated_definitions.h
+hiwonder_freertos_led\heap_4.o: ../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F/portmacro.h
+hiwonder_freertos_led\heap_4.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h
+hiwonder_freertos_led\heap_4.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h
+hiwonder_freertos_led\heap_4.o: ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h
