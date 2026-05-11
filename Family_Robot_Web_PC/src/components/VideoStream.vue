@@ -1,180 +1,73 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 
 interface Props {
-  streamUrl: string;
-  streamType?: 'mjpeg' | 'http' | 'webrtc';
-  autoplay?: boolean;
-  muted?: boolean;
-  width?: string;
-  height?: string;
+  streamUrl: string
+  streamType?: 'mjpeg' | 'http'
+  autoplay?: boolean
+  muted?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   streamType: 'mjpeg',
   autoplay: true,
   muted: true,
-  width: '100%',
-  height: '100%',
-});
+})
 
-const videoElement = ref<HTMLVideoElement | null>(null);
-const imgElement = ref<HTMLImageElement | null>(null);
-const isLoading = ref(true);
-const errorMessage = ref<string | null>(null);
+const imgRef = ref<HTMLImageElement | null>(null)
+const isLoading = ref(true)
+const errorMsg = ref<string | null>(null)
 
-const loadStream = () => {
-  if (!props.streamUrl) {
-    isLoading.value = true;
-    errorMessage.value = null;
-    if (imgElement.value) {
-      imgElement.value.src = '';
-    }
-    if (videoElement.value) {
-      videoElement.value.pause();
-      videoElement.value.src = '';
-    }
-    return;
+function clear() {
+  if (imgRef.value) imgRef.value.src = ''
+  isLoading.value = true
+  errorMsg.value = null
+}
+
+function load() {
+  clear()
+  if (!props.streamUrl) return
+
+  if (!imgRef.value) return
+  imgRef.value.onload = () => {
+    isLoading.value = false
+    errorMsg.value = null
   }
-
-  isLoading.value = true;
-  errorMessage.value = null;
-
-  if (props.streamType === 'mjpeg') {
-    loadMjpegStream();
-    return;
+  imgRef.value.onerror = () => {
+    isLoading.value = false
+    errorMsg.value = 'Failed to load MJPEG stream'
   }
+  imgRef.value.src = props.streamUrl
+}
 
-  if (props.streamType === 'http') {
-    loadHttpStream();
-    return;
-  }
-
-  isLoading.value = false;
-  errorMessage.value = 'WebRTC mode is not implemented yet';
-};
-
-const loadMjpegStream = () => {
-  if (!imgElement.value) {
-    return;
-  }
-
-  imgElement.value.onload = () => {
-    isLoading.value = false;
-    errorMessage.value = null;
-  };
-
-  imgElement.value.onerror = () => {
-    isLoading.value = false;
-    errorMessage.value = 'Unable to load MJPEG stream';
-  };
-
-  imgElement.value.src = props.streamUrl;
-};
-
-const loadHttpStream = () => {
-  if (!videoElement.value) {
-    return;
-  }
-
-  videoElement.value.onloadedmetadata = () => {
-    isLoading.value = false;
-    errorMessage.value = null;
-  };
-
-  videoElement.value.onerror = () => {
-    isLoading.value = false;
-    errorMessage.value = 'Unable to load HTTP video stream';
-  };
-
-  videoElement.value.src = props.streamUrl;
-};
-
-watch(() => [props.streamUrl, props.streamType], loadStream);
-
-onMounted(loadStream);
-
-onUnmounted(() => {
-  if (videoElement.value) {
-    videoElement.value.pause();
-    videoElement.value.src = '';
-  }
-  if (imgElement.value) {
-    imgElement.value.src = '';
-  }
-});
+watch(() => props.streamUrl, load)
+onMounted(load)
+onUnmounted(clear)
 </script>
 
 <template>
-  <div class="video-stream-container" :style="{ width: props.width, height: props.height }">
+  <div class="relative w-full h-full bg-black overflow-hidden">
     <img
       v-if="streamType === 'mjpeg'"
-      ref="imgElement"
-      class="video-stream"
-      alt="MJPEG stream"
+      ref="imgRef"
+      class="w-full h-full object-contain"
+      alt="Camera stream"
     />
 
-    <video
-      v-else-if="streamType === 'http'"
-      ref="videoElement"
-      class="video-stream"
-      :autoplay="autoplay"
-      :muted="muted"
-      playsinline
+    <div
+      v-if="isLoading && !errorMsg"
+      class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10"
     >
-      Your browser does not support video playback.
-    </video>
-
-    <div v-else class="stream-placeholder">
-      <p>WebRTC placeholder</p>
+      <div class="w-8 h-8 border-2 border-neutral-600 border-t-blue-500 rounded-full animate-spin mb-3" />
+      <p class="text-sm text-neutral-400">Waiting for camera...</p>
     </div>
 
-    <div v-if="isLoading" class="stream-loading">
-      <p>Waiting for camera stream...</p>
-    </div>
-
-    <div v-if="errorMessage" class="stream-error">
-      <div class="error-icon">!</div>
-      <p>{{ errorMessage }}</p>
+    <div
+      v-if="errorMsg"
+      class="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10"
+    >
+      <span class="text-3xl mb-2">!</span>
+      <p class="text-sm text-red-400">{{ errorMsg }}</p>
     </div>
   </div>
 </template>
-
-<style scoped>
-.video-stream-container {
-  position: relative;
-  background-color: #000;
-  border-radius: 4px;
-  overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.video-stream {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.stream-loading,
-.stream-error,
-.stream-placeholder {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  color: #fff;
-  background-color: rgba(0, 0, 0, 0.7);
-  z-index: 10;
-}
-
-.stream-error {
-  color: #ff7676;
-}
-
-.error-icon {
-  font-size: 2rem;
-  margin-bottom: 0.5rem;
-}
-</style>

@@ -90,6 +90,9 @@ def _find_alsa_card_device(command: list[str], name_substring: str) -> Optional[
 class PiWebRTCCallBridge:
     """Handle one active WebRTC call session on Raspberry Pi."""
 
+    _cached_mic_source: Optional[str] = None
+    _cached_spk_target: Optional[str] = None
+
     def __init__(self):
         self._pc = None
         self._mic_player = None
@@ -171,7 +174,7 @@ class PiWebRTCCallBridge:
 
         answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
-        await self._wait_for_ice_gathering_complete(pc, timeout=2.0)
+        await self._wait_for_ice_gathering_complete(pc, timeout=0.3)
 
         local = pc.localDescription
         await send_json(
@@ -283,9 +286,13 @@ class PiWebRTCCallBridge:
             )
         )
 
+        if PiWebRTCCallBridge._cached_mic_source is not None:
+            candidates.insert(0, PiWebRTCCallBridge._cached_mic_source)
+
         for source in candidates:
             try:
                 player = MediaPlayer(source, format=fmt, options=options)
+                PiWebRTCCallBridge._cached_mic_source = source
                 logger.info("Using Pi WebRTC microphone source: %s", source)
                 return player
             except Exception as exc:
@@ -330,9 +337,13 @@ class PiWebRTCCallBridge:
             )
         )
 
+        if PiWebRTCCallBridge._cached_spk_target is not None:
+            candidates.insert(0, PiWebRTCCallBridge._cached_spk_target)
+
         for target in candidates:
             try:
                 recorder = MediaRecorder(target, format=fmt, options=options)
+                PiWebRTCCallBridge._cached_spk_target = target
                 logger.info("Using Pi WebRTC speaker target: %s", target)
                 return recorder
             except Exception as exc:

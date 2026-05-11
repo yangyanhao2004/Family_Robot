@@ -42,11 +42,16 @@ async def websocket_pi_endpoint(websocket: WebSocket):
                     await router.route_message("robot", data)
                 else:
                     logger.warning("Unknown Pi message: %s", message_type)
+            except WebSocketDisconnect:
+                raise
             except Exception as exc:
                 logger.error("Pi message error: %s", exc)
-                await manager.send_to_pi(
-                    ErrorMessage(type="error", message=f"Invalid message: {exc}").model_dump()
-                )
+                try:
+                    await manager.send_to_pi(
+                        ErrorMessage(type="error", message=f"Invalid message: {exc}").model_dump()
+                    )
+                except WebSocketDisconnect:
+                    raise
             except asyncio.TimeoutError:
                 continue
     except WebSocketDisconnect:

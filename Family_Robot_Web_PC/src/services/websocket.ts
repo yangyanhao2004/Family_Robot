@@ -1,4 +1,4 @@
-import { useRobotStore } from '../store/robotStore';
+import { useRobotStore } from '@/stores/robotStore';
 
 export type RobotCommand =
   | 'forward'
@@ -43,8 +43,14 @@ class WebSocketService {
 
   private listeners = new Set<MessageListener>();
 
-  constructor(url = 'ws://localhost:8080/ws') {
-    this.url = url;
+  constructor(url?: string) {
+    if (url) {
+      this.url = url;
+    } else {
+      const httpBase = import.meta.env.VITE_BACKEND_HTTP_URL || 'http://localhost:8080';
+      const wsBase = httpBase.replace(/^http/, 'ws');
+      this.url = wsBase.replace(/\/$/, '') + '/ws';
+    }
   }
 
   connect(customUrl?: string): void {

@@ -16,6 +16,15 @@ class WebRTCService {
     this.handleSignalingMessage(message.data as WebRTCSignalPayload);
   };
 
+  async preAcquireMic(): Promise<void> {
+    if (this.localStream) return;
+    try {
+      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    } catch {
+      // Mic not available or permission denied; will retry on call
+    }
+  }
+
   async startCall(): Promise<void> {
     if (!webSocketService.isConnected()) {
       throw new Error('WebSocket is not connected');
@@ -34,11 +43,6 @@ class WebRTCService {
   }
 
   close(): void {
-    if (this.localStream) {
-      this.localStream.getTracks().forEach((track) => track.stop());
-      this.localStream = null;
-    }
-
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = null;
@@ -85,8 +89,11 @@ class WebRTCService {
     this.peerConnection = new RTCPeerConnection({ iceServers: this.iceServers });
     this.setupEventHandlers();
 
-    this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    if (!this.localStream) {
+      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    }
     this.localStream.getAudioTracks().forEach((track) => {
+      track.enabled = this.isMicEnabled;
       this.peerConnection?.addTrack(track, this.localStream!);
     });
   }
