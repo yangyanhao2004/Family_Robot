@@ -1,3 +1,6 @@
+# Python virtualenv (legacy — old Pi backend was here)
+.venv/
+
 # Maven
 target/
 pom.xml.tag
