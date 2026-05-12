@@ -1,0 +1,75 @@
+package com.familyrobot.controller;
+
+import com.familyrobot.model.dto.AdminUserDto;
+import com.familyrobot.model.dto.RobotRegistrationRequest;
+import com.familyrobot.model.entity.Robot;
+import com.familyrobot.model.entity.User;
+import com.familyrobot.repository.RobotRepository;
+import com.familyrobot.repository.UserRepository;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/admin")
+@RequiredArgsConstructor
+public class AdminController {
+
+    private final UserRepository userRepository;
+    private final RobotRepository robotRepository;
+
+    private void requireAdmin(User user) {
+        if (!"Admin".equals(user.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin access required");
+        }
+    }
+
+    @GetMapping("/users")
+    public ResponseEntity<List<AdminUserDto>> listUsers(@AuthenticationPrincipal User user) {
+        requireAdmin(user);
+
+        List<User> users = userRepository.findAll();
+        List<Robot> robots = robotRepository.findAll();
+
+        List<AdminUserDto> dtos = users.stream()
+                .map(u -> AdminUserDto.builder()
+                        .userId(u.getId())
+                        .email(u.getEmail())
+                        .name(u.getName())
+                        .role(u.getRole())
+                        .passwordHash(u.getPasswordHash())
+                        .robotSerialNumbers(robots.stream()
+                                .filter(r -> r.getUser() != null && r.getUser().getId().equals(u.getId()))
+                                .map(Robot::getSerialNumber)
+                                .toList())
+                        .build())
+                .toList();
+
+        return ResponseEntity.ok(dtos);
+    }
+
+    @PostMapping("/robots")
+    public ResponseEntity<Map<String, String>> registerRobot(
+            @AuthenticationPrincipal User user,
+            @Valid @RequestBody RobotRegistrationRequest request) {
+        requireAdmin(user);
+
+        if (robotRepository.findBySerialNumber(request.getSerialNumber()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Serial number already exists");
+        }
+
+        Robot robot = Robot.builder()
+                .serialNumber(request.getSerialNumber())
+                .build();
+        robotRepository.save(robot);
+
+        return ResponseEntity.ok(Map.of("message", "registered"));
+    }
+}

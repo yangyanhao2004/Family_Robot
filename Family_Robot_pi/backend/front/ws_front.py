@@ -44,8 +44,9 @@ async def websocket_front_endpoint(websocket: WebSocket):
                     RegisterMessage(**data)
                     await websocket.send_json({"type": "register_success"})
                 elif message_type == "command":
-                    await handle_command_message(data)
-                    await router.route_message("web", data)
+                    should_forward = await handle_command_message(data)
+                    if should_forward:
+                        await router.route_message("web", data)
                 elif message_type == "webrtc_signaling":
                     await handle_webrtc_signaling_message(data)
                     await router.route_message("web", data)

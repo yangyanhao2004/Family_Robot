@@ -13,7 +13,7 @@ The backend has been merged into the Pi project under `backend/`.
 - Then launches Pi logic: voice agent (daemon thread) + remote WebSocket client (asyncio main thread)
 - Pi remote client connects to `127.0.0.1:8080` by default (backend on same machine)
 
-**Backend (`backend/`)** — merged from Family_Robot_Back_PC:
+**Backend (`backend/`)** — lightweight real-time relay (WebSocket + MJPEG + WebRTC signaling):
 - `backend/app.py` — FastAPI app with 3 endpoints: `/ws`, `/ws/rtc`, `/video/stream`, `GET /`
 - `backend/core/` — ConnectionManager (single web + single Pi connection), MessageRouter, RTCService (room-based signaling), VideoStreamHub (in-memory latest-frame MJPEG)
 - `backend/front/` — Web frontend WS handler, validates commands/WebRTC, manages session_control (pause Pi voice when web connected)
@@ -38,8 +38,15 @@ The backend has been merged into the Pi project under `backend/`.
 - Backend URL set via `VITE_BACKEND_HTTP_URL` in `.env.local` — point to Pi's IP:8080
 - Run: `npm run dev` (Vite dev server)
 
-### 3. Family_Robot_Back_PC (Legacy, now merged into Family_Robot_pi/backend/)
-- Original standalone backend. Kept for reference. All functionality now lives in `Family_Robot_pi/backend/`.
+### 3. Family_Robot_Back_PC — Java Spring Boot Data Backend (Port 8090)
+- REST API for persistent data: auth (JWT login/logout), user profile, settings, photo album CRUD
+- Command logging: `POST /api/commands` records robot commands from the web frontend
+- Scheduled tasks: hourly command stats, daily cleanup of logs older than 30 days
+- MySQL database via Spring Data JPA (Hibernate `ddl-auto: update`)
+- CORS allows all origins (development mode)
+- Port: 8090 (configurable via `SERVER_PORT` env var)
+- Run: `mvn spring-boot:run` or `java -jar target/family-robot-backend-1.0.0.jar`
+- Runs on PC alongside the web frontend; complements the Pi's Python real-time backend
 
 ### 4. Family_Robot_STM32 (C + FreeRTOS on STM32F407)
 - `Family_Bot_STM32/FreeRTOS/Src/main.c` — all custom logic is in USER CODE blocks
@@ -52,10 +59,14 @@ The backend has been merged into the Pi project under `backend/`.
 - Tasks: defaultTask (prints encoder speeds every 2s), LED_Task (blink PE10)
 
 ## Data Flow
-- Web → Backend → Pi: command + webrtc_signaling messages
-- Pi → Backend → Web: status + camera_frame + webrtc_signaling messages
-- Pi camera → base64 JPEG → Backend VideoStreamHub → HTTP MJPEG → Browser
-- WebRTC audio: Browser ↔ (signaling via Backend) ↔ Pi (aiortc)
+**Real-time layer** (Python on Pi:8080):
+- Web → Python Backend → Pi: command + webrtc_signaling messages
+- Pi → Python Backend → Web: status + camera_frame + webrtc_signaling messages
+- Pi camera → base64 JPEG → Python Backend VideoStreamHub → HTTP MJPEG → Browser
+- WebRTC audio: Browser ↔ (signaling via Python Backend) ↔ Pi (aiortc)
+
+**Data layer** (Java on PC:8090):
+- Web → Java Backend → MySQL: auth, user profile, settings, album CRUD, command logging
 
 ## Startup (Unified, on Pi)
 ```bash

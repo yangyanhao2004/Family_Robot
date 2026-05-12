@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { api } from '@/services/api'
 import { Bot, Mail, Lock, KeyRound, ChevronRight } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -12,23 +13,43 @@ const email = ref('')
 const password = ref('')
 const code = ref('')
 const isSendingCode = ref(false)
+const errorMsg = ref('')
 
-function handleSendCode() {
+async function handleSendCode() {
   if (!email.value) return
   isSendingCode.value = true
-  setTimeout(() => {
+  errorMsg.value = ''
+  try {
+    if (loginMethod.value === 'code') {
+      await api.sendLoginCode(email.value)
+    } else {
+      // password mode doesn't send code
+      return
+    }
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+  } finally {
     isSendingCode.value = false
-    alert('验证码已发送至邮箱')
-  }, 1000)
+  }
 }
 
 async function handleLogin(e: Event) {
   e.preventDefault()
+  errorMsg.value = ''
   try {
-    await auth.login(email.value, password.value || 'demo')
-    router.push('/home')
-  } catch {
-    // ignore
+    if (loginMethod.value === 'code') {
+      const res = await api.verifyLoginCode(email.value, code.value)
+      auth.setAuth(res.token, res.role)
+    } else {
+      await auth.login(email.value, password.value)
+    }
+    if (auth.isAdmin) {
+      router.push('/admin')
+    } else {
+      router.push('/home')
+    }
+  } catch (e) {
+    errorMsg.value = (e as Error).message
   }
 }
 </script>
@@ -57,6 +78,10 @@ async function handleLogin(e: Event) {
         <div class="text-center lg:text-left space-y-2">
           <h2 class="text-2xl font-semibold">欢迎回来</h2>
           <p class="text-sm text-neutral-400">请选择登录方式进入控制面板</p>
+        </div>
+
+        <div v-if="errorMsg" class="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl p-3">
+          {{ errorMsg }}
         </div>
 
         <div class="flex p-1 bg-[#222] rounded-xl">
@@ -141,6 +166,25 @@ async function handleLogin(e: Event) {
             <ChevronRight class="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </button>
         </form>
+
+        <div class="text-center space-y-3">
+          <div>
+            <router-link
+              to="/reset-password"
+              class="text-sm text-neutral-500 hover:text-amber-400 transition-colors"
+            >
+              忘记密码？
+            </router-link>
+          </div>
+          <div>
+            <router-link
+              to="/register"
+              class="text-sm text-neutral-500 hover:text-emerald-400 transition-colors"
+            >
+              还没有账户？立即注册
+            </router-link>
+          </div>
+        </div>
       </div>
     </div>
   </div>

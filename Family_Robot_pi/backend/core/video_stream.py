@@ -15,6 +15,11 @@ class VideoStreamHub:
         self._latest_seq = 0
         self._latest_frame: Optional[bytes] = None
 
+    @property
+    def latest_frame(self):
+        with self._lock:
+            return self._latest_frame
+
     async def publish_frame(self, frame_bytes: bytes):
         if not frame_bytes:
             return

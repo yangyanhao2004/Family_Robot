@@ -7,7 +7,8 @@ export type RobotCommand =
   | 'right'
   | 'stop'
   | 'light_on'
-  | 'light_off';
+  | 'light_off'
+  | 'take_photo';
 
 export type WebRTCSignalType = 'offer' | 'answer' | 'candidate';
 
@@ -165,7 +166,7 @@ class WebSocketService {
     } else if (data.type === 'status' && data.payload) {
       store.updateRobotStatus(data.payload);
     } else if (data.type === 'error') {
-      store.updateConnectionStatus(false, data.message || 'Backend error');
+      store.addNotification(data.message || 'Backend error', 'error');
     }
 
     this.listeners.forEach((listener) => {

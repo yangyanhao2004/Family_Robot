@@ -7,10 +7,16 @@ import type { AlbumPhoto } from '@/types'
 const photos = ref<AlbumPhoto[]>([])
 const selected = ref<string[]>([])
 const loading = ref(true)
+const error = ref<string | null>(null)
 
 onMounted(async () => {
-  photos.value = await api.getPhotos()
-  loading.value = false
+  try {
+    photos.value = await api.getPhotos()
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    loading.value = false
+  }
 })
 
 function toggleSelect(id: string) {
@@ -64,6 +70,11 @@ function downloadPhoto(url: string) {
     </div>
 
     <div v-if="loading" class="flex justify-center py-16 text-neutral-500">Loading...</div>
+
+    <div v-else-if="error" class="flex flex-col items-center gap-3 py-16 text-neutral-500">
+      <p>Failed to load photos</p>
+      <p class="text-xs text-red-400">{{ error }}</p>
+    </div>
 
     <div v-else class="grid grid-cols-2 gap-3">
       <div

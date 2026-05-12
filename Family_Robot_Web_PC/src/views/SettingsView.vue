@@ -9,10 +9,16 @@ const settings = ref<RobotSettings>({
   serialNumber: '',
 })
 const loading = ref(true)
+const error = ref<string | null>(null)
 
 onMounted(async () => {
-  settings.value = await api.getSettings()
-  loading.value = false
+  try {
+    settings.value = await api.getSettings()
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    loading.value = false
+  }
 })
 
 async function toggleAutoSave() {
@@ -26,6 +32,11 @@ async function toggleAutoSave() {
     <h3 class="text-sm font-semibold text-neutral-300 uppercase tracking-wider">Settings</h3>
 
     <div v-if="loading" class="text-neutral-500">Loading...</div>
+
+    <div v-else-if="error" class="text-neutral-500">
+      <p>Failed to load settings</p>
+      <p class="text-xs text-red-400 mt-1">{{ error }}</p>
+    </div>
 
     <template v-else>
       <!-- Auto-save toggle -->

@@ -1,71 +1,120 @@
-const BASE_URL = import.meta.env.VITE_BACKEND_HTTP_URL || 'http://localhost:8080'
+const JAVA_API_URL = import.meta.env.VITE_JAVA_API_URL || 'http://localhost:8090'
 
-function httpBase() {
-  return BASE_URL.replace(/\/$/, '')
+function apiBase() {
+  return JAVA_API_URL.replace(/\/$/, '')
+}
+
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('auth_token')
+  if (token) {
+    return { Authorization: `Bearer ${token}` }
+  }
+  return {}
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${httpBase()}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+  const res = await fetch(`${apiBase()}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...options?.headers },
     ...options,
   })
-  if (!res.ok) throw new Error(`API ${options?.method || 'GET'} ${path} failed: ${res.status}`)
+  if (!res.ok) {
+    let message = `${options?.method || 'GET'} ${path} failed (${res.status})`
+    try {
+      const body = await res.json()
+      if (body.message) {
+        message = body.message
+      }
+    } catch {
+      // response is not JSON, use raw text
+      const text = await res.text()
+      if (text) message = text
+    }
+    throw new Error(message)
+  }
   return res.json()
 }
 
 export const api = {
-  // Auth — mock for now, real when Java backend is ready
+  // ---- Auth ----
   login: (email: string, password: string) =>
-    new Promise<{ token: string }>((resolve) =>
-      setTimeout(() => resolve({ token: 'mock-jwt-token' }), 600)
-    ),
+    request<{ token: string; role: string }>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+
+  register: (email: string, password: string, serialNumber: string) =>
+    request<{ message: string }>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, serialNumber }),
+    }),
+
+  verify: (email: string, code: string) =>
+    request<{ message: string }>('/api/auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    }),
 
   logout: () =>
-    new Promise<void>((resolve) => setTimeout(resolve, 200)),
+    request<void>('/api/auth/logout', { method: 'POST' }),
 
-  // Album — mock
+  sendLoginCode: (email: string) =>
+    request<{ message: string }>('/api/auth/login-code/send', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  verifyLoginCode: (email: string, code: string) =>
+    request<{ token: string; role: string }>('/api/auth/login-code/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code }),
+    }),
+
+  sendResetPasswordCode: (email: string) =>
+    request<{ message: string }>('/api/auth/reset-password/send', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (email: string, code: string, newPassword: string) =>
+    request<{ message: string }>('/api/auth/reset-password/verify', {
+      method: 'POST',
+      body: JSON.stringify({ email, code, newPassword }),
+    }),
+
+  // ---- Album ----
   getPhotos: () =>
-    new Promise<{ id: string; url: string; date: string }[]>((resolve) =>
-      setTimeout(
-        () =>
-          resolve([
-            { id: '1', url: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=400', date: '2026-05-10' },
-            { id: '2', url: 'https://images.unsplash.com/photo-1527430253228-e93688616381?w=400', date: '2026-05-09' },
-            { id: '3', url: 'https://images.unsplash.com/photo-1558618666-fcd25c85f82e?w=400', date: '2026-05-08' },
-            { id: '4', url: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400', date: '2026-05-07' },
-          ]),
-        300
-      )
-    ),
+    request<{ id: string; url: string; date: string }[]>('/api/albums'),
 
   deletePhoto: (id: string) =>
-    new Promise<void>((resolve) => setTimeout(resolve, 200)),
+    request<void>(`/api/albums/${id}`, { method: 'DELETE' }),
 
-  // Settings — mock
+  addPhoto: (url: string, filename: string) =>
+    request<{ message: string }>('/api/albums', {
+      method: 'POST',
+      body: JSON.stringify({ url, filename }),
+    }),
+
+  // ---- Settings ----
   getSettings: () =>
-    new Promise<{ autoSave: boolean; firmwareVersion: string; serialNumber: string }>((resolve) =>
-      setTimeout(
-        () =>
-          resolve({ autoSave: true, firmwareVersion: 'v2.4.1 (latest)', serialNumber: 'RBT-98234-XYZ' }),
-        200
-      )
-    ),
+    request<{ autoSave: boolean; firmwareVersion: string; serialNumber: string }>('/api/settings'),
 
   updateSettings: (settings: Record<string, unknown>) =>
-    new Promise<void>((resolve) => setTimeout(resolve, 200)),
+    request<void>('/api/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
 
-  // User — mock
+  // ---- User Profile ----
   getProfile: () =>
-    new Promise<{ name: string; email: string; role: string; lastLogin: string }>((resolve) =>
-      setTimeout(
-        () =>
-          resolve({
-            name: 'Admin',
-            email: 'admin@family-robot.local',
-            role: 'Admin',
-            lastLogin: new Date().toLocaleString(),
-          }),
-        200
-      )
-    ),
+    request<{ name: string; email: string; role: string; lastLogin: string }>('/api/users/profile'),
+
+  // ---- Admin ----
+  getAdminUsers: () =>
+    request<{ userId: number; email: string; name: string; role: string; passwordHash: string; robotSerialNumbers: string[] }[]>('/api/admin/users'),
+
+  registerRobot: (serialNumber: string) =>
+    request<{ message: string }>('/api/admin/robots', {
+      method: 'POST',
+      body: JSON.stringify({ serialNumber }),
+    }),
 }

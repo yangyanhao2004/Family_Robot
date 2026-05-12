@@ -1,0 +1,54 @@
+server:
+  port: ${SERVER_PORT:8090}
+  error:
+    include-stacktrace: never
+    include-message: always
+
+spring:
+  application:
+    name: family-robot-backend
+
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/family_robot?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
+
+  mail:
+    host: smtp.qq.com
+    port: 587
+    username: yangyanhao2004@qq.com
+    password: uwzdtheplqgwjbah
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  jackson:
+    property-naming-strategy: LOWER_CAMEL_CASE
+    serialization:
+      write-dates-as-timestamps: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:family-robot-jwt-secret-key-change-in-production-256bits}
+    expiration-ms: ${JWT_EXPIRATION:86400000}
+
+logging:
+  level:
+    com.familyrobot: DEBUG

@@ -1,9 +1,11 @@
 import asyncio
 import logging
+import os
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from backend.core.connection_manager import manager
 from backend.core.rtc_service import rtc_service
@@ -102,6 +104,30 @@ async def video_stream():
         headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
                   "Pragma": "no-cache"},
     )
+
+
+PHOTOS_DIR = os.path.join(os.path.dirname(__file__), "..", "photos")
+os.makedirs(PHOTOS_DIR, exist_ok=True)
+app.mount("/photos", StaticFiles(directory=PHOTOS_DIR), name="photos")
+
+
+@app.get("/api/photos")
+async def list_photos():
+    items = []
+    if os.path.isdir(PHOTOS_DIR):
+        for fname in sorted(os.listdir(PHOTOS_DIR), reverse=True):
+            if fname.lower().endswith((".jpg", ".jpeg", ".png")):
+                fpath = os.path.join(PHOTOS_DIR, fname)
+                mtime = os.path.getmtime(fpath)
+                from datetime import datetime, timezone, timedelta
+                tz = timezone(timedelta(hours=8))
+                date_str = datetime.fromtimestamp(mtime, tz).strftime("%Y-%m-%d")
+                items.append({
+                    "id": fname,
+                    "url": f"/photos/{fname}",
+                    "date": date_str,
+                })
+    return items
 
 
 @app.get("/")

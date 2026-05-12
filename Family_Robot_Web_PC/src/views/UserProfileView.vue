@@ -17,11 +17,17 @@ const profile = ref<UserProfile>({
   lastLogin: '',
 })
 const loading = ref(true)
+const error = ref<string | null>(null)
 
 onMounted(async () => {
-  const data = await api.getProfile()
-  profile.value = { avatar: '', ...data }
-  loading.value = false
+  try {
+    const data = await api.getProfile()
+    profile.value = { avatar: '', ...data }
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    loading.value = false
+  }
 })
 
 function handleLogout() {
@@ -35,6 +41,11 @@ function handleLogout() {
     <h3 class="text-sm font-semibold text-neutral-300 uppercase tracking-wider">User Profile</h3>
 
     <div v-if="loading" class="text-neutral-500">Loading...</div>
+
+    <div v-else-if="error" class="text-neutral-500">
+      <p>Failed to load profile</p>
+      <p class="text-xs text-red-400 mt-1">{{ error }}</p>
+    </div>
 
     <template v-else>
       <!-- Avatar + name -->
