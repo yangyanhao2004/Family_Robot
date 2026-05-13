@@ -177,14 +177,15 @@ if AIORTC_AVAILABLE:
             self._samples_elapsed += len(data) // 2
             pts = self._samples_elapsed
 
-            frame = AudioFrame(data=data)
+            # PyAV 12+ constructor: AudioFrame(format, layout, samples)
+            # then fill PCM data via planes[0].update()
+            frame = AudioFrame(
+                format="s16",
+                layout="mono",
+                samples=len(data) // 2,
+            )
+            frame.planes[0].update(data)
             frame.sample_rate = self._sample_rate
-            # aiortc < 1.4 uses "number_of_channels", >= 1.4 uses "num_channels"
-            if hasattr(type(frame), "num_channels"):
-                frame.num_channels = self._channels
-            else:
-                frame.number_of_channels = self._channels  # type: ignore[attr-defined]
-            frame.samples = len(data) // 2
             frame.pts = pts
             return frame
 
