@@ -108,9 +108,10 @@ if AIORTC_AVAILABLE:
     class SDAudioStreamTrack(MediaStreamTrack):
         """Audio stream track backed by sounddevice (PortAudio).
 
-        Audio data is pushed from the PortAudio callback thread directly
-        into the asyncio event loop via ``call_soon_threadsafe``, avoiding
-        thread-pool overhead and minimising latency.
+        Audio data crosses from the PortAudio C callback thread into the
+        asyncio event loop using a ``queue.Queue`` (GIL-friendly C impl)
+        plus a rate-limited ``call_soon_threadsafe`` wakeup.  This avoids
+        GIL contention that would cause ALSA input overflows.
         """
 
         kind = "audio"
@@ -127,40 +128,60 @@ if AIORTC_AVAILABLE:
             self._sample_rate = sample_rate
             self._channels = channels
             self._blocksize = blocksize
+            self._queue: queue.Queue = queue.Queue(maxsize=8)
             self._stream: Optional[sd.InputStream] = None
             self._samples_elapsed = 0
             self._stopped = threading.Event()
             self._recv_count = 0
+            self._overflow_count = 0
 
-            # Cross-thread data handoff without a queue:
-            #   PortAudio callback → call_soon_threadsafe → _on_audio → asyncio.Event
             self._loop: Optional[asyncio.AbstractEventLoop] = None
-            self._chunk: bytes = b""
-            self._chunk_lock = threading.Lock()
             self._chunk_ready = asyncio.Event()
+            # Guard against flooding the event loop with wakeup callbacks.
+            self._wakeup_scheduled = False
+            self._wakeup_lock = threading.Lock()
 
         def _callback(self, indata, frames, time_info, status):
+            if self._stopped.is_set():
+                return
             if status:
-                logger.warning("SDAudioStreamTrack status flag: %s", status)
+                self._overflow_count += 1
+                if self._overflow_count <= 3 or self._overflow_count % 50 == 0:
+                    logger.warning(
+                        "SDAudioStreamTrack status flag: %s (count=%d)",
+                        status,
+                        self._overflow_count,
+                    )
                 return
-            if self._stopped.is_set():
+            self._overflow_count = 0
+            # queue.Queue is implemented in C — fast and GIL-friendly
+            try:
+                self._queue.put_nowait(bytes(indata))
+            except queue.Full:
                 return
-            chunk = bytes(indata)
-            # Hand off to event loop — no thread pool needed
-            self._loop.call_soon_threadsafe(self._on_audio, chunk)
+            # Only schedule wakeup once per batch to minimise GIL contention
+            with self._wakeup_lock:
+                if not self._wakeup_scheduled:
+                    self._wakeup_scheduled = True
+                    self._loop.call_soon_threadsafe(self._on_wakeup)
 
-        def _on_audio(self, chunk: bytes) -> None:
-            if self._stopped.is_set():
-                return
-            with self._chunk_lock:
-                self._chunk = chunk
+        def _on_wakeup(self) -> None:
+            self._wakeup_scheduled = False
             self._chunk_ready.set()
 
         def start(self) -> None:
             self._stopped.clear()
             self._recv_count = 0
+            self._overflow_count = 0
             self._loop = asyncio.get_running_loop()
             self._chunk_ready.clear()
+            self._wakeup_scheduled = False
+            # Drain any stale data from previous session
+            while not self._queue.empty():
+                try:
+                    self._queue.get_nowait()
+                except queue.Empty:
+                    break
             self._stream = sd.RawInputStream(
                 device=self._device,
                 samplerate=self._sample_rate,
@@ -178,6 +199,12 @@ if AIORTC_AVAILABLE:
                 self._stream.stop()
                 self._stream.close()
                 self._stream = None
+            # Drain queue so the PortAudio callback won't touch stale state
+            while not self._queue.empty():
+                try:
+                    self._queue.get_nowait()
+                except queue.Empty:
+                    break
             # Wake up recv() if it's waiting
             if self._loop and self._loop.is_running():
                 self._loop.call_soon_threadsafe(self._chunk_ready.set)
@@ -188,13 +215,22 @@ if AIORTC_AVAILABLE:
             if self._stopped.is_set():
                 raise RuntimeError("SDAudioStreamTrack stopped")
 
-            with self._chunk_lock:
-                data = self._chunk
+            # Drain all queued chunks, keeping only the latest.
+            # This adapts to slow consumers without accumulating latency.
+            data = b""
+            while True:
+                try:
+                    data = self._queue.get_nowait()
+                except queue.Empty:
+                    break
+
+            if not data:
+                return await self.recv()
+
             samples = len(data) // 2
             self._samples_elapsed += samples
             pts = self._samples_elapsed
 
-            # PyAV 12+: explicit format/layout for reliable encoding
             frame = AudioFrame(
                 format="s16",
                 layout="mono",
@@ -204,7 +240,6 @@ if AIORTC_AVAILABLE:
             frame.sample_rate = self._sample_rate
             frame.pts = pts
 
-            # Log first frames for diagnostics
             self._recv_count += 1
             if self._recv_count <= 3:
                 peak = np.max(np.frombuffer(data, dtype=np.int16))

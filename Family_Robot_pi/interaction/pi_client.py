@@ -198,6 +198,12 @@ class PiWebSocketClient:
         )
         self._notify_session_control(remote_active)
 
+        if not remote_active:
+            # Frontend disconnected — tear down any active WebRTC call so
+            # the mic is released promptly.  Otherwise wake word resume would
+            # race with the ICE timeout (which can take 30+ seconds).
+            asyncio.create_task(self._webrtc_call_bridge.close())
+
     def _handle_backend_disconnected(self):
         if not self.force_local_on_backend_disconnect:
             return
