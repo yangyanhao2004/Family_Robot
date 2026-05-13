@@ -10,8 +10,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import queue
 import re
 import subprocess
+import threading
 import time
 from typing import Awaitable, Callable, Dict, Iterable, Optional
 
@@ -106,9 +108,10 @@ if AIORTC_AVAILABLE:
     class SDAudioStreamTrack(MediaStreamTrack):
         """Audio stream track backed by sounddevice (PortAudio).
 
-        Uses the same sounddevice/PortAudio stack as the wake word detector and
-        AudioManager, avoiding ALSA device contention that MediaPlayer (ffmpeg)
-        hits on Raspberry Pi.
+        Audio data crosses from the PortAudio C callback thread into the
+        asyncio event loop via a thread-safe ``queue.Queue`` and
+        ``loop.run_in_executor``, avoiding the edge cases of cross-thread
+        ``asyncio.Queue.put_nowait``.
         """
 
         kind = "audio"
@@ -125,21 +128,23 @@ if AIORTC_AVAILABLE:
             self._sample_rate = sample_rate
             self._channels = channels
             self._blocksize = blocksize
-            self._queue: asyncio.Queue = asyncio.Queue(maxsize=20)
+            self._queue: queue.Queue = queue.Queue(maxsize=20)
             self._stream: Optional[sd.InputStream] = None
-            self._start_time: float = 0.0
             self._samples_elapsed = 0
+            self._stopped = threading.Event()
 
         def _callback(self, indata, frames, time_info, status):
             if status:
                 return
+            if self._stopped.is_set():
+                return
             try:
-                # Thread-safe: asyncio.Queue.put_nowait is safe from external threads
                 self._queue.put_nowait(bytes(indata))
-            except asyncio.QueueFull:
+            except queue.Full:
                 pass
 
         def start(self) -> None:
+            self._stopped.clear()
             self._stream = sd.RawInputStream(
                 device=self._device,
                 samplerate=self._sample_rate,
@@ -150,16 +155,25 @@ if AIORTC_AVAILABLE:
                 latency="high",
             )
             self._stream.start()
-            self._start_time = time.time()
 
         def stop(self) -> None:
+            self._stopped.set()
             if self._stream is not None:
                 self._stream.stop()
                 self._stream.close()
                 self._stream = None
+            # Unblock any pending queue.get() in recv()
+            try:
+                self._queue.put_nowait(b"")
+            except queue.Full:
+                pass
 
         async def recv(self):
-            data = await self._queue.get()
+            loop = asyncio.get_running_loop()
+            data = await loop.run_in_executor(None, self._queue.get)
+            if self._stopped.is_set() or not data:
+                if not data:
+                    raise RuntimeError("SDAudioStreamTrack stopped")
             self._samples_elapsed += len(data) // 2
             pts = self._samples_elapsed
 
@@ -382,6 +396,9 @@ class PiWebRTCCallBridge:
         if self._mic_ownership_handler is not None:
             logger.info("Mic ownership: requesting transfer from wake word to WebRTC")
             await self._mic_ownership_handler(True)
+            # Wait for wake word detector's PortAudio stream to fully close
+            # before opening a new one for WebRTC, avoiding EBUSY on ALSA.
+            await asyncio.sleep(0.3)
         self._mic_owned = True
 
     async def _release_mic_locked(self):
