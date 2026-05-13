@@ -215,6 +215,24 @@ class Orchestrator:
         """Stop the assistant loop."""
         self._running = False
 
+    def pause_wake_word_detector(self):
+        """Pause wake word detection so WebRTC can take the mic."""
+        with self._state_lock:
+            if not self._wake_word_started:
+                return
+        self.wake_word.pause()
+        print("[mic] Wake word detector paused (mic released for WebRTC)")
+
+    def resume_wake_word_detector(self):
+        """Resume wake word detection if system state allows."""
+        with self._state_lock:
+            if not self._wake_word_started:
+                return
+            if self._remote_session_active:
+                return
+        self.wake_word.resume()
+        print("[mic] Wake word detector resumed")
+
     def is_remote_session_active(self) -> bool:
         with self._state_lock:
             return self._remote_session_active

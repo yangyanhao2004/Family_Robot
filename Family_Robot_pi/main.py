@@ -117,6 +117,16 @@ def _run_all(args: argparse.Namespace):
                 return
         orchestrator.set_remote_session_active(remote_active)
 
+    def on_wake_word_control(pause: bool):
+        with shared_lock:
+            orchestrator = shared.get("orchestrator")
+        if orchestrator is None:
+            return
+        if pause:
+            orchestrator.pause_wake_word_detector()
+        else:
+            orchestrator.resume_wake_word_detector()
+
     def voice_runner():
         try:
             from orchestrator import Orchestrator
@@ -141,6 +151,7 @@ def _run_all(args: argparse.Namespace):
         reconnect_interval=args.reconnect_interval,
         status_interval=args.status_interval,
         session_control_handler=on_remote_session_change,
+        wake_word_control_handler=on_wake_word_control,
     )
 
     try:

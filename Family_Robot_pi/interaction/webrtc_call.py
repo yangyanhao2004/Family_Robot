@@ -189,22 +189,38 @@ class _MicSource:
         self._stop_fn()
 
 
+MicOwnershipHandler = Callable[[bool], Awaitable[None]]
+
+
 class PiWebRTCCallBridge:
-    """Handle one active WebRTC call session on Raspberry Pi."""
+    """Handle one active WebRTC call session on Raspberry Pi.
+
+    Mic ownership model:
+    - Default: wake word detector owns the mic
+    - WebRTC call starts: mic transferred to WebRTC (wake word paused)
+    - WebRTC call ends: mic returned to wake word detector
+    Ownership is coordinated via the ``mic_ownership_handler`` callback.
+    """
 
     _cached_mic_source: Optional[str] = None
     _cached_spk_target: Optional[str] = None
 
-    def __init__(self):
+    def __init__(
+        self,
+        mic_ownership_handler: Optional[MicOwnershipHandler] = None,
+    ):
         self._pc = None
         self._mic_player = None
         self._speaker_recorder = None
         self._lock = asyncio.Lock()
         self._availability_warned = False
+        self._mic_ownership_handler = mic_ownership_handler
+        self._mic_owned = False
 
     async def close(self):
         async with self._lock:
             await self._close_locked()
+            await self._release_mic_locked()
 
     async def handle_signaling(self, signaling_data: Dict, send_json: SendJson):
         if not AIORTC_AVAILABLE:
@@ -264,11 +280,15 @@ class PiWebRTCCallBridge:
             if state in {"failed", "closed", "disconnected"}:
                 await self.close()
 
+        # Acquire mic ownership from wake word detector before capture
+        await self._acquire_mic_locked()
+
         self._mic_player = self._create_mic_player()
         if self._mic_player is not None and self._mic_player.audio is not None:
             pc.addTrack(self._mic_player.audio)
         else:
             logger.warning("No microphone track available for Pi WebRTC upload")
+            await self._release_mic_locked()
 
         await pc.setRemoteDescription(
             RTCSessionDescription(sdp=offer["sdp"], type=offer["type"])
@@ -354,6 +374,24 @@ class PiWebRTCCallBridge:
             except Exception:
                 pass
             self._pc = None
+
+    async def _acquire_mic_locked(self):
+        """Request mic ownership from the wake word detector."""
+        if self._mic_owned:
+            return
+        if self._mic_ownership_handler is not None:
+            logger.info("Mic ownership: requesting transfer from wake word to WebRTC")
+            await self._mic_ownership_handler(True)
+        self._mic_owned = True
+
+    async def _release_mic_locked(self):
+        """Return mic ownership to the wake word detector."""
+        if not self._mic_owned:
+            return
+        if self._mic_ownership_handler is not None:
+            logger.info("Mic ownership: returning from WebRTC to wake word")
+            await self._mic_ownership_handler(False)
+        self._mic_owned = False
 
     def _create_mic_player(self):
         """Create a microphone source for WebRTC upload.

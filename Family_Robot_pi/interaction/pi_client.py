@@ -75,6 +75,7 @@ class PiWebSocketClient:
         camera_jpeg_quality: int = 70,
         camera_streamer: Optional[CameraStreamer] = None,
         session_control_handler: Optional[Callable[[bool], None]] = None,
+        wake_word_control_handler: Optional[Callable[[bool], None]] = None,
         force_local_on_backend_disconnect: bool = True,
         ws_open_timeout: float = 8.0,
     ):
@@ -91,9 +92,26 @@ class PiWebSocketClient:
         self._camera_started = False
         self._remote_session_active = False
         self._session_control_handler = session_control_handler
+        self._wake_word_control_handler = wake_word_control_handler
         self.force_local_on_backend_disconnect = force_local_on_backend_disconnect
         self.ws_open_timeout = max(2.0, float(ws_open_timeout))
-        self._webrtc_call_bridge = PiWebRTCCallBridge()
+
+        # Mic ownership coordination: WebRTC call takes mic from wake word,
+        # returns it when the call ends.
+        async def _on_mic_ownership(acquire: bool):
+            handler = self._wake_word_control_handler
+            if handler is None:
+                return
+            if acquire:
+                logger.info("Mic ownership: WebRTC acquiring mic from wake word")
+                handler(True)
+            else:
+                logger.info("Mic ownership: WebRTC releasing mic back to wake word")
+                handler(False)
+
+        self._webrtc_call_bridge = PiWebRTCCallBridge(
+            mic_ownership_handler=_on_mic_ownership,
+        )
 
         if self.camera_enabled and self.camera_streamer is None:
             self.camera_streamer = CameraStreamer(
