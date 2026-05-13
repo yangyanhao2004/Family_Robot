@@ -12,11 +12,13 @@ import logging
 import os
 import re
 import subprocess
+import time
 from typing import Awaitable, Callable, Dict, Iterable, Optional
 
 try:
     from aiortc import RTCPeerConnection, RTCSessionDescription
     from aiortc.contrib.media import MediaPlayer, MediaRecorder
+    from aiortc.mediastreams import AudioFrame, MediaStreamTrack
     from aiortc.sdp import candidate_from_sdp
 
     AIORTC_AVAILABLE = True
@@ -25,8 +27,20 @@ except Exception:  # pragma: no cover - optional dependency
     RTCSessionDescription = None  # type: ignore
     MediaPlayer = None  # type: ignore
     MediaRecorder = None  # type: ignore
+    MediaStreamTrack = None  # type: ignore
+    AudioFrame = None  # type: ignore
     candidate_from_sdp = None  # type: ignore
     AIORTC_AVAILABLE = False
+
+try:
+    import numpy as np
+    import sounddevice as sd
+
+    SOUNDDEVICE_AVAILABLE = True
+except Exception:  # pragma: no cover
+    np = None  # type: ignore
+    sd = None  # type: ignore
+    SOUNDDEVICE_AVAILABLE = False
 
 
 logger = logging.getLogger("interaction.webrtc_call")
@@ -85,6 +99,94 @@ def _find_alsa_card_device(command: list[str], name_substring: str) -> Optional[
             return "plughw:{},0".format(card_part)
 
     return None
+
+
+if AIORTC_AVAILABLE:
+
+    class SDAudioStreamTrack(MediaStreamTrack):
+        """Audio stream track backed by sounddevice (PortAudio).
+
+        Uses the same sounddevice/PortAudio stack as the wake word detector and
+        AudioManager, avoiding ALSA device contention that MediaPlayer (ffmpeg)
+        hits on Raspberry Pi.
+        """
+
+        kind = "audio"
+
+        def __init__(
+            self,
+            device: Optional[int],
+            sample_rate: int = 48000,
+            channels: int = 1,
+            blocksize: int = 960,
+        ):
+            super().__init__()
+            self._device = device
+            self._sample_rate = sample_rate
+            self._channels = channels
+            self._blocksize = blocksize
+            self._queue: asyncio.Queue = asyncio.Queue(maxsize=20)
+            self._stream: Optional[sd.InputStream] = None
+            self._start_time: float = 0.0
+            self._samples_elapsed = 0
+
+        def _callback(self, indata, frames, time_info, status):
+            if status:
+                return
+            try:
+                # Thread-safe: asyncio.Queue.put_nowait is safe from external threads
+                self._queue.put_nowait(bytes(indata))
+            except asyncio.QueueFull:
+                pass
+
+        def start(self) -> None:
+            self._stream = sd.RawInputStream(
+                device=self._device,
+                samplerate=self._sample_rate,
+                channels=self._channels,
+                dtype="int16",
+                blocksize=self._blocksize,
+                callback=self._callback,
+                latency="high",
+            )
+            self._stream.start()
+            self._start_time = time.time()
+
+        def stop(self) -> None:
+            if self._stream is not None:
+                self._stream.stop()
+                self._stream.close()
+                self._stream = None
+
+        async def recv(self):
+            data = await self._queue.get()
+            self._samples_elapsed += len(data) // 2
+            pts = self._samples_elapsed
+
+            frame = AudioFrame(data=data)
+            frame.sample_rate = self._sample_rate
+            # aiortc < 1.4 uses "number_of_channels", >= 1.4 uses "num_channels"
+            if hasattr(type(frame), "num_channels"):
+                frame.num_channels = self._channels
+            else:
+                frame.number_of_channels = self._channels  # type: ignore[attr-defined]
+            frame.samples = len(data) // 2
+            frame.pts = pts
+            return frame
+
+else:
+    SDAudioStreamTrack = None  # type: ignore
+
+
+class _MicSource:
+    """Unified wrapper for mic capture backends."""
+
+    def __init__(self, audio, stop_fn):
+        self.audio = audio
+        self._stop_fn = stop_fn
+
+    def stop(self):
+        self._stop_fn()
 
 
 class PiWebRTCCallBridge:
@@ -254,8 +356,70 @@ class PiWebRTCCallBridge:
             self._pc = None
 
     def _create_mic_player(self):
+        """Create a microphone source for WebRTC upload.
+
+        Tries the following backends in order:
+        1. sounddevice (PortAudio) — proven on Pi, shares with wake word detector
+        2. MediaPlayer (ffmpeg ALSA) — fallback for non-Pi environments
+        """
         if not AIORTC_AVAILABLE:
             return None
+
+        # --- Primary: sounddevice-based capture ---
+        if SOUNDDEVICE_AVAILABLE:
+            track = self._create_sd_mic_track()
+            if track is not None:
+                logger.info("Using Pi WebRTC microphone source: sounddevice")
+                return _MicSource(track, track.stop)
+
+        # --- Fallback: MediaPlayer (ffmpeg ALSA) ---
+        return self._create_alsa_mic_player()
+
+    def _find_sd_mic_device(self) -> Optional[int]:
+        """Find the sounddevice input device index by name."""
+        device_name = os.getenv(
+            "FAMILY_ROBOT_WEBRTC_MIC_DEVICE_NAME",
+            DEFAULT_WEBRTC_MIC_DEVICE_NAME,
+        )
+        if not device_name:
+            return None
+
+        try:
+            for idx, dev in enumerate(sd.query_devices()):
+                if (
+                    device_name.lower() in dev["name"].lower()
+                    and dev["max_input_channels"] > 0
+                ):
+                    return idx
+        except Exception:
+            pass
+        return None
+
+    def _create_sd_mic_track(self) -> Optional["SDAudioStreamTrack"]:
+        if not SOUNDDEVICE_AVAILABLE or SDAudioStreamTrack is None:
+            return None
+
+        try:
+            device = self._find_sd_mic_device()
+            sample_rate = int(
+                os.getenv("FAMILY_ROBOT_WEBRTC_MIC_SAMPLE_RATE", "48000")
+            )
+            channels = int(os.getenv("FAMILY_ROBOT_WEBRTC_MIC_CHANNELS", "1"))
+            blocksize = sample_rate // 50  # 20ms frames
+
+            track = SDAudioStreamTrack(
+                device=device,
+                sample_rate=sample_rate,
+                channels=channels,
+                blocksize=blocksize,
+            )
+            track.start()
+            return track
+        except Exception as exc:
+            logger.warning("Failed to create sounddevice mic track: %s", exc)
+            return None
+
+    def _create_alsa_mic_player(self):
 
         explicit_source = os.getenv("FAMILY_ROBOT_WEBRTC_MIC_SOURCE", "")
         device_name = os.getenv(
@@ -275,10 +439,28 @@ class PiWebRTCCallBridge:
             if prefer_explicit
             else [auto_source or "", explicit_source]
         )
+        # Build dsnoop candidates for mic sharing (ALSA allows concurrent access)
+        dsnoop_candidates = []
+        if auto_source:
+            card_info = _ALSA_CARD_DEVICE_RE.search(auto_source or "")
+            if not card_info:
+                card_info = _ALSA_CARD_DEVICE_RE.search(explicit_source or "")
+            if card_info:
+                dsnoop_candidates.extend(
+                    [
+                        "dsnoop:{},{}".format(card_info.group(1), card_info.group(2)),
+                        "dsnoop:CARD={},DEV={}".format(
+                            card_info.group(1), card_info.group(2)
+                        ),
+                    ]
+                )
+
         candidates = list(
             _dedupe(
                 ordered
+                + dsnoop_candidates
                 + [
+                    "dsnoop:1,0",
                     "plughw:1,0",
                     "hw:1,0",
                     "default",
