@@ -250,38 +250,6 @@ if AIORTC_AVAILABLE:
 else:
     SDAudioStreamTrack = None  # type: ignore
 
-            if not data:
-                return await self.recv()
-
-            samples = len(data) // 2
-            self._samples_elapsed += samples
-            pts = self._samples_elapsed
-
-            frame = AudioFrame(
-                format="s16",
-                layout="mono",
-                samples=samples,
-            )
-            frame.planes[0].update(data)
-            frame.sample_rate = self._sample_rate
-            frame.pts = pts
-
-            self._recv_count += 1
-            if self._recv_count <= 3:
-                peak = np.max(np.frombuffer(data, dtype=np.int16))
-                logger.info(
-                    "SDAudioStreamTrack frame #%d: %d samples, peak=%d, pts=%d",
-                    self._recv_count,
-                    samples,
-                    peak,
-                    pts,
-                )
-
-            return frame
-
-else:
-    SDAudioStreamTrack = None  # type: ignore
-
 
 class _MicSource:
     """Unified wrapper for mic capture backends."""
