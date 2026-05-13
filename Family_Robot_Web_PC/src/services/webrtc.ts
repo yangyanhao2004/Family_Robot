@@ -4,6 +4,7 @@ class WebRTCService {
   private peerConnection: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
   private remoteStream: MediaStream | null = null;
+  private remoteAudio: HTMLAudioElement | null = null;
   private isMicEnabled = true;
   private isSignalingBound = false;
 
@@ -48,6 +49,11 @@ class WebRTCService {
       this.peerConnection = null;
     }
 
+    if (this.remoteAudio) {
+      this.remoteAudio.srcObject = null;
+      this.remoteAudio.remove();
+      this.remoteAudio = null;
+    }
     this.remoteStream = null;
     this.isMicEnabled = true;
 
@@ -112,6 +118,12 @@ class WebRTCService {
     this.peerConnection.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
         this.remoteStream = event.streams[0];
+        // Auto-play remote audio via a hidden Audio element
+        const audio = new Audio();
+        audio.srcObject = event.streams[0];
+        audio.autoplay = true;
+        audio.play().catch((e) => console.warn('[WebRTC] remote audio play failed:', e));
+        this.remoteAudio = audio;
       }
     };
   }
