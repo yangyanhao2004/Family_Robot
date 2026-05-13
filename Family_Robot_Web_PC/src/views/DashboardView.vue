@@ -17,23 +17,18 @@ function sendCommand(cmd: RobotCommand) {
   if (isConnected()) webSocketService.sendCommand(cmd)
 }
 
+function onCallStateChange(state: 'idle' | 'connecting' | 'connected' | 'failed') {
+  callStatus.value = state === 'failed' ? 'idle' : state
+}
+
 function handleCallClick() {
   if (callStatus.value === 'idle') {
     callStatus.value = 'connecting'
-    webRTCService.startCall().catch(() => {})
-    const check = setInterval(() => {
-      const state = webRTCService.getConnectionState()
-      if (state === 'connected') {
-        callStatus.value = 'connected'
-        clearInterval(check)
-      } else if (state === 'failed' || state === 'closed' || state === 'disconnected') {
-        callStatus.value = 'idle'
-        clearInterval(check)
-      }
-    }, 500)
+    webRTCService.startCall().catch(() => {
+      callStatus.value = 'idle'
+    })
   } else {
     webRTCService.close()
-    callStatus.value = 'idle'
   }
 }
 
@@ -122,12 +117,16 @@ onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   webSocketService.addMessageListener(onPhotoCaptured)
+  webRTCService.onCallStateChange(onCallStateChange)
+  webRTCService.preAcquireMic()
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
   webSocketService.removeMessageListener(onPhotoCaptured)
+  webRTCService.onCallStateChange(null)
+  webRTCService.close()
   callStatus.value = 'idle'
   activeKeys.value = {}
 })

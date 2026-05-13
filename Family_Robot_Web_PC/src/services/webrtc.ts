@@ -1,5 +1,7 @@
 import webSocketService, { WebRTCSignalPayload, WebSocketMessage } from './websocket';
 
+export type CallState = 'idle' | 'connecting' | 'connected' | 'failed';
+
 class WebRTCService {
   private peerConnection: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
@@ -7,6 +9,7 @@ class WebRTCService {
   private remoteAudio: HTMLAudioElement | null = null;
   private isMicEnabled = true;
   private isSignalingBound = false;
+  private stateListener: ((state: CallState) => void) | null = null;
 
   private readonly iceServers: RTCIceServer[] = [
     { urls: ['stun:stun.l.google.com:19302'] },
@@ -61,6 +64,12 @@ class WebRTCService {
       webSocketService.removeMessageListener(this.signalingListener);
       this.isSignalingBound = false;
     }
+
+    this.notifyState('idle');
+  }
+
+  onCallStateChange(listener: ((state: CallState) => void) | null): void {
+    this.stateListener = listener;
   }
 
   getRemoteStream(): MediaStream | null {
@@ -104,6 +113,12 @@ class WebRTCService {
     });
   }
 
+  private notifyState(state: CallState): void {
+    if (this.stateListener) {
+      this.stateListener(state);
+    }
+  }
+
   private setupEventHandlers(): void {
     if (!this.peerConnection) return;
 
@@ -115,10 +130,20 @@ class WebRTCService {
       });
     };
 
+    this.peerConnection.onconnectionstatechange = () => {
+      const state = this.peerConnection?.connectionState;
+      if (state === 'connected') {
+        this.notifyState('connected');
+      } else if (state === 'failed' || state === 'closed' || state === 'disconnected') {
+        this.notifyState(state === 'failed' ? 'failed' : 'idle');
+      } else if (state === 'connecting') {
+        this.notifyState('connecting');
+      }
+    };
+
     this.peerConnection.ontrack = (event) => {
       if (event.streams && event.streams[0]) {
         this.remoteStream = event.streams[0];
-        // Auto-play remote audio via a hidden Audio element
         const audio = new Audio();
         audio.srcObject = event.streams[0];
         audio.autoplay = true;
