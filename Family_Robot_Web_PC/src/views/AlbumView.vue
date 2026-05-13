@@ -4,6 +4,12 @@ import { api } from '@/services/api'
 import { Download, Trash2, Check } from 'lucide-vue-next'
 import type { AlbumPhoto } from '@/types'
 
+const PYTHON_BACKEND = import.meta.env.VITE_BACKEND_HTTP_URL || 'http://localhost:8080'
+
+function fullUrl(url: string) {
+  return url.startsWith('http') ? url : `${PYTHON_BACKEND}${url}`
+}
+
 const photos = ref<AlbumPhoto[]>([])
 const selected = ref<string[]>([])
 const loading = ref(true)
@@ -84,7 +90,7 @@ function downloadPhoto(url: string) {
         @click="toggleSelect(photo.id)"
       >
         <img
-          :src="photo.url"
+          :src="fullUrl(photo.url)"
           class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
           alt=""
         />
@@ -107,7 +113,7 @@ function downloadPhoto(url: string) {
 
         <button
           class="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          @click.stop="downloadPhoto(photo.url)"
+          @click.stop="downloadPhoto(fullUrl(photo.url))"
         >
           <Download class="w-3.5 h-3.5 text-white" />
         </button>

@@ -37,6 +37,7 @@ function handleCallClick() {
   }
 }
 
+const PYTHON_BACKEND = import.meta.env.VITE_BACKEND_HTTP_URL || 'http://localhost:8080'
 const isTakingPhoto = ref(false)
 
 function handleTakePhotos() {
@@ -49,8 +50,8 @@ function onPhotoCaptured(msg: WebSocketMessage) {
   if (msg.type !== 'photo_captured') return
   isTakingPhoto.value = false
   const payload = msg.payload as { url: string; filename: string; date: string }
-  // Save photo metadata to Java backend
-  api.addPhoto(payload.url, payload.filename)
+  const fullUrl = payload.url.startsWith('http') ? payload.url : `${PYTHON_BACKEND}${payload.url}`
+  api.addPhoto(fullUrl, payload.filename)
     .then(() => {
       store.addNotification('拍照成功，已保存至相册', 'success')
     })
