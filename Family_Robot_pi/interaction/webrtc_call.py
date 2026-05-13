@@ -108,10 +108,9 @@ if AIORTC_AVAILABLE:
     class SDAudioStreamTrack(MediaStreamTrack):
         """Audio stream track backed by sounddevice (PortAudio).
 
-        Audio data crosses from the PortAudio C callback thread into the
-        asyncio event loop via a thread-safe ``queue.Queue`` and
-        ``loop.run_in_executor``, avoiding the edge cases of cross-thread
-        ``asyncio.Queue.put_nowait``.
+        Audio data is pushed from the PortAudio callback thread directly
+        into the asyncio event loop via ``call_soon_threadsafe``, avoiding
+        thread-pool overhead and minimising latency.
         """
 
         kind = "audio"
@@ -121,18 +120,24 @@ if AIORTC_AVAILABLE:
             device: Optional[int],
             sample_rate: int = 48000,
             channels: int = 1,
-            blocksize: int = 960,
+            blocksize: int = 480,
         ):
             super().__init__()
             self._device = device
             self._sample_rate = sample_rate
             self._channels = channels
             self._blocksize = blocksize
-            self._queue: queue.Queue = queue.Queue(maxsize=4)
             self._stream: Optional[sd.InputStream] = None
             self._samples_elapsed = 0
             self._stopped = threading.Event()
             self._recv_count = 0
+
+            # Cross-thread data handoff without a queue:
+            #   PortAudio callback → call_soon_threadsafe → _on_audio → asyncio.Event
+            self._loop: Optional[asyncio.AbstractEventLoop] = None
+            self._chunk: bytes = b""
+            self._chunk_lock = threading.Lock()
+            self._chunk_ready = asyncio.Event()
 
         def _callback(self, indata, frames, time_info, status):
             if status:
@@ -140,14 +145,22 @@ if AIORTC_AVAILABLE:
                 return
             if self._stopped.is_set():
                 return
-            try:
-                self._queue.put_nowait(bytes(indata[:frames]))
-            except queue.Full:
-                pass
+            chunk = indata[:frames].tobytes()
+            # Hand off to event loop — no thread pool needed
+            self._loop.call_soon_threadsafe(self._on_audio, chunk)
+
+        def _on_audio(self, chunk: bytes) -> None:
+            if self._stopped.is_set():
+                return
+            with self._chunk_lock:
+                self._chunk = chunk
+            self._chunk_ready.set()
 
         def start(self) -> None:
             self._stopped.clear()
             self._recv_count = 0
+            self._loop = asyncio.get_running_loop()
+            self._chunk_ready.clear()
             self._stream = sd.RawInputStream(
                 device=self._device,
                 samplerate=self._sample_rate,
@@ -165,39 +178,40 @@ if AIORTC_AVAILABLE:
                 self._stream.stop()
                 self._stream.close()
                 self._stream = None
-            # Unblock any pending queue.get() in recv()
-            try:
-                self._queue.put_nowait(b"")
-            except queue.Full:
-                pass
+            # Wake up recv() if it's waiting
+            if self._loop and self._loop.is_running():
+                self._loop.call_soon_threadsafe(self._chunk_ready.set)
 
         async def recv(self):
-            loop = asyncio.get_running_loop()
-            data = await loop.run_in_executor(None, self._queue.get)
-            if self._stopped.is_set() or not data:
-                if not data:
-                    raise RuntimeError("SDAudioStreamTrack stopped")
-            self._samples_elapsed += len(data) // 2
+            await self._chunk_ready.wait()
+            self._chunk_ready.clear()
+            if self._stopped.is_set():
+                raise RuntimeError("SDAudioStreamTrack stopped")
+
+            with self._chunk_lock:
+                data = self._chunk
+            samples = len(data) // 2
+            self._samples_elapsed += samples
             pts = self._samples_elapsed
 
-            # PyAV 12+: build AudioFrame from numpy array
-            arr = np.frombuffer(data, dtype=np.int16).copy()
-            frame = AudioFrame.from_ndarray(
-                arr.reshape(1, -1),
+            # PyAV 12+: explicit format/layout for reliable encoding
+            frame = AudioFrame(
                 format="s16",
                 layout="mono",
+                samples=samples,
             )
+            frame.planes[0].update(data)
             frame.sample_rate = self._sample_rate
             frame.pts = pts
 
             # Log first frames for diagnostics
             self._recv_count += 1
             if self._recv_count <= 3:
-                peak = np.max(np.abs(arr))
+                peak = np.max(np.frombuffer(data, dtype=np.int16))
                 logger.info(
                     "SDAudioStreamTrack frame #%d: %d samples, peak=%d, pts=%d",
                     self._recv_count,
-                    len(arr),
+                    samples,
                     peak,
                     pts,
                 )
