@@ -135,11 +135,12 @@ if AIORTC_AVAILABLE:
 
         def _callback(self, indata, frames, time_info, status):
             if status:
+                logger.warning("SDAudioStreamTrack status flag: %s", status)
                 return
             if self._stopped.is_set():
                 return
             try:
-                self._queue.put_nowait(bytes(indata))
+                self._queue.put_nowait(bytes(indata[:frames]))
             except queue.Full:
                 pass
 
@@ -177,14 +178,13 @@ if AIORTC_AVAILABLE:
             self._samples_elapsed += len(data) // 2
             pts = self._samples_elapsed
 
-            # PyAV 12+ constructor: AudioFrame(format, layout, samples)
-            # then fill PCM data via planes[0].update()
-            frame = AudioFrame(
+            # PyAV 12+: build AudioFrame from numpy array
+            arr = np.frombuffer(data, dtype=np.int16).copy()
+            frame = AudioFrame.from_ndarray(
+                arr.reshape(1, -1),
                 format="s16",
                 layout="mono",
-                samples=len(data) // 2,
             )
-            frame.planes[0].update(data)
             frame.sample_rate = self._sample_rate
             frame.pts = pts
             return frame
