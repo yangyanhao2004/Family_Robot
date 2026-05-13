@@ -145,7 +145,7 @@ if AIORTC_AVAILABLE:
                 return
             if self._stopped.is_set():
                 return
-            chunk = indata[:frames].tobytes()
+            chunk = bytes(indata)
             # Hand off to event loop — no thread pool needed
             self._loop.call_soon_threadsafe(self._on_audio, chunk)
 
