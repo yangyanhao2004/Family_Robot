@@ -132,6 +132,7 @@ if AIORTC_AVAILABLE:
             self._stream: Optional[sd.InputStream] = None
             self._samples_elapsed = 0
             self._stopped = threading.Event()
+            self._recv_count = 0
 
         def _callback(self, indata, frames, time_info, status):
             if status:
@@ -146,6 +147,7 @@ if AIORTC_AVAILABLE:
 
         def start(self) -> None:
             self._stopped.clear()
+            self._recv_count = 0
             self._stream = sd.RawInputStream(
                 device=self._device,
                 samplerate=self._sample_rate,
@@ -187,6 +189,19 @@ if AIORTC_AVAILABLE:
             )
             frame.sample_rate = self._sample_rate
             frame.pts = pts
+
+            # Log first frames for diagnostics
+            self._recv_count += 1
+            if self._recv_count <= 3:
+                peak = np.max(np.abs(arr))
+                logger.info(
+                    "SDAudioStreamTrack frame #%d: %d samples, peak=%d, pts=%d",
+                    self._recv_count,
+                    len(arr),
+                    peak,
+                    pts,
+                )
+
             return frame
 
 else:
@@ -399,7 +414,7 @@ class PiWebRTCCallBridge:
             await self._mic_ownership_handler(True)
             # Wait for wake word detector's PortAudio stream to fully close
             # before opening a new one for WebRTC, avoiding EBUSY on ALSA.
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.5)
         self._mic_owned = True
 
     async def _release_mic_locked(self):
