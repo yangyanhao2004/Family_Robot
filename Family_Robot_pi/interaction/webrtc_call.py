@@ -110,8 +110,7 @@ if AIORTC_AVAILABLE:
 
         Audio data crosses from the PortAudio C callback thread into the
         asyncio event loop using a ``queue.Queue`` (GIL-friendly C impl)
-        plus a rate-limited ``call_soon_threadsafe`` wakeup.  This avoids
-        GIL contention that would cause ALSA input overflows.
+        plus a rate-limited ``call_soon_threadsafe`` wakeup.
         """
 
         kind = "audio"
@@ -121,23 +120,22 @@ if AIORTC_AVAILABLE:
             device: Optional[int],
             sample_rate: int = 48000,
             channels: int = 1,
-            blocksize: int = 480,
+            blocksize: int = 960,
         ):
             super().__init__()
             self._device = device
             self._sample_rate = sample_rate
             self._channels = channels
             self._blocksize = blocksize
-            self._queue: queue.Queue = queue.Queue(maxsize=8)
+            self._queue: queue.Queue = queue.Queue(maxsize=4)
             self._stream: Optional[sd.InputStream] = None
             self._samples_elapsed = 0
             self._stopped = threading.Event()
             self._recv_count = 0
-            self._overflow_count = 0
+            self._overflow_total = 0
 
             self._loop: Optional[asyncio.AbstractEventLoop] = None
             self._chunk_ready = asyncio.Event()
-            # Guard against flooding the event loop with wakeup callbacks.
             self._wakeup_scheduled = False
             self._wakeup_lock = threading.Lock()
 
@@ -145,25 +143,25 @@ if AIORTC_AVAILABLE:
             if self._stopped.is_set():
                 return
             if status:
-                self._overflow_count += 1
-                if self._overflow_count <= 3 or self._overflow_count % 50 == 0:
+                self._overflow_total += 1
+                if self._overflow_total <= 3 or self._overflow_total % 50 == 0:
                     logger.warning(
-                        "SDAudioStreamTrack status flag: %s (count=%d)",
+                        "SDAudioStreamTrack status flag: %s (total=%d)",
                         status,
-                        self._overflow_count,
+                        self._overflow_total,
                     )
                 return
-            self._overflow_count = 0
-            # queue.Queue is implemented in C — fast and GIL-friendly
             try:
                 self._queue.put_nowait(bytes(indata))
             except queue.Full:
                 return
-            # Only schedule wakeup once per batch to minimise GIL contention
+            need_wakeup = False
             with self._wakeup_lock:
                 if not self._wakeup_scheduled:
                     self._wakeup_scheduled = True
-                    self._loop.call_soon_threadsafe(self._on_wakeup)
+                    need_wakeup = True
+            if need_wakeup:
+                self._loop.call_soon_threadsafe(self._on_wakeup)
 
         def _on_wakeup(self) -> None:
             self._wakeup_scheduled = False
@@ -172,11 +170,10 @@ if AIORTC_AVAILABLE:
         def start(self) -> None:
             self._stopped.clear()
             self._recv_count = 0
-            self._overflow_count = 0
+            self._overflow_total = 0
             self._loop = asyncio.get_running_loop()
             self._chunk_ready.clear()
             self._wakeup_scheduled = False
-            # Drain any stale data from previous session
             while not self._queue.empty():
                 try:
                     self._queue.get_nowait()
@@ -189,7 +186,7 @@ if AIORTC_AVAILABLE:
                 dtype="int16",
                 blocksize=self._blocksize,
                 callback=self._callback,
-                latency="low",
+                latency="high",
             )
             self._stream.start()
 
@@ -199,13 +196,11 @@ if AIORTC_AVAILABLE:
                 self._stream.stop()
                 self._stream.close()
                 self._stream = None
-            # Drain queue so the PortAudio callback won't touch stale state
             while not self._queue.empty():
                 try:
                     self._queue.get_nowait()
                 except queue.Empty:
                     break
-            # Wake up recv() if it's waiting
             if self._loop and self._loop.is_running():
                 self._loop.call_soon_threadsafe(self._chunk_ready.set)
 
@@ -216,13 +211,44 @@ if AIORTC_AVAILABLE:
                 raise RuntimeError("SDAudioStreamTrack stopped")
 
             # Drain all queued chunks, keeping only the latest.
-            # This adapts to slow consumers without accumulating latency.
             data = b""
             while True:
                 try:
                     data = self._queue.get_nowait()
                 except queue.Empty:
                     break
+
+            if not data:
+                return await self.recv()
+
+            samples = len(data) // 2
+            self._samples_elapsed += samples
+            pts = self._samples_elapsed
+
+            frame = AudioFrame(
+                format="s16",
+                layout="mono",
+                samples=samples,
+            )
+            frame.planes[0].update(data)
+            frame.sample_rate = self._sample_rate
+            frame.pts = pts
+
+            self._recv_count += 1
+            if self._recv_count <= 3:
+                peak = np.max(np.frombuffer(data, dtype=np.int16))
+                logger.info(
+                    "SDAudioStreamTrack frame #%d: %d samples, peak=%d, pts=%d",
+                    self._recv_count,
+                    samples,
+                    peak,
+                    pts,
+                )
+
+            return frame
+
+else:
+    SDAudioStreamTrack = None  # type: ignore
 
             if not data:
                 return await self.recv()
@@ -525,7 +551,7 @@ class PiWebRTCCallBridge:
                 os.getenv("FAMILY_ROBOT_WEBRTC_MIC_SAMPLE_RATE", "48000")
             )
             channels = int(os.getenv("FAMILY_ROBOT_WEBRTC_MIC_CHANNELS", "1"))
-            blocksize = sample_rate // 100  # 10ms frames for low latency
+            blocksize = sample_rate // 50  # 20ms frames
 
             track = SDAudioStreamTrack(
                 device=device,
