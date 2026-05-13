@@ -128,7 +128,7 @@ if AIORTC_AVAILABLE:
             self._sample_rate = sample_rate
             self._channels = channels
             self._blocksize = blocksize
-            self._queue: queue.Queue = queue.Queue(maxsize=20)
+            self._queue: queue.Queue = queue.Queue(maxsize=4)
             self._stream: Optional[sd.InputStream] = None
             self._samples_elapsed = 0
             self._stopped = threading.Event()
@@ -155,7 +155,7 @@ if AIORTC_AVAILABLE:
                 dtype="int16",
                 blocksize=self._blocksize,
                 callback=self._callback,
-                latency="high",
+                latency="low",
             )
             self._stream.start()
 
@@ -476,7 +476,7 @@ class PiWebRTCCallBridge:
                 os.getenv("FAMILY_ROBOT_WEBRTC_MIC_SAMPLE_RATE", "48000")
             )
             channels = int(os.getenv("FAMILY_ROBOT_WEBRTC_MIC_CHANNELS", "1"))
-            blocksize = sample_rate // 50  # 20ms frames
+            blocksize = sample_rate // 100  # 10ms frames for low latency
 
             track = SDAudioStreamTrack(
                 device=device,
