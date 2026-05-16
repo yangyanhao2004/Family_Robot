@@ -70,16 +70,16 @@ function dirToCommand(dir: string): RobotCommand {
 // PTZ servo control (WASD / on-screen buttons)
 function ptzAdjust(dir: string) {
   if (dir === 'up' || dir === 'w') {
-    servo2Angle.value = Math.min(180, servo2Angle.value + PTZ_STEP)
-    sendCommand('servo2', servo2Angle.value)
-  } else if (dir === 'down' || dir === 's') {
     servo2Angle.value = Math.max(0, servo2Angle.value - PTZ_STEP)
     sendCommand('servo2', servo2Angle.value)
+  } else if (dir === 'down' || dir === 's') {
+    servo2Angle.value = Math.min(180, servo2Angle.value + PTZ_STEP)
+    sendCommand('servo2', servo2Angle.value)
   } else if (dir === 'left' || dir === 'a') {
-    servo1Angle.value = Math.max(0, servo1Angle.value - PTZ_STEP)
+    servo1Angle.value = Math.min(180, servo1Angle.value + PTZ_STEP)
     sendCommand('servo1', servo1Angle.value)
   } else if (dir === 'right' || dir === 'd') {
-    servo1Angle.value = Math.min(180, servo1Angle.value + PTZ_STEP)
+    servo1Angle.value = Math.max(0, servo1Angle.value - PTZ_STEP)
     sendCommand('servo1', servo1Angle.value)
   }
 }
