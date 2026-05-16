@@ -69,8 +69,8 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 
 /* ===== 电机 PWM 引脚 (TIM1 CH1~CH4 → PE9/PE11/PE13/PE14) ===== */
-/* 丝印M1(电机1): CH3正转/CH4反转 → PE13/PE14, 编码器TIM2(PA15/PB3) */
-/* 丝印M2(电机2): CH1正转/CH2反转 → PE9/PE11,  编码器TIM5(PA0/PA1)  */
+/* 丝印M1(电机1): CH3正转/CH4反转 → PE13/PE14, 编码器TIM5(PA0/PA1)  */
+/* 丝印M2(电机2): CH1正转/CH2反转 → PE9/PE11,  编码器TIM2(PA15/PB3) */
 #define MOTOR1_PWM_POS_Pin      GPIO_PIN_13   /* TIM1_CH3  丝印M1正转 */
 #define MOTOR1_PWM_POS_Port     GPIOE
 #define MOTOR1_PWM_NEG_Pin      GPIO_PIN_14   /* TIM1_CH4  丝印M1反转 */

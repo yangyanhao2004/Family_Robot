@@ -12,9 +12,13 @@ const isConnected = () => store.connectionStatus === 'connected'
 const callStatus = ref<'idle' | 'connecting' | 'connected'>('idle')
 const activeKeys = ref<Record<string, boolean>>({})
 const pressedDir = ref<string | null>(null)
+const servo1Angle = ref(90)
+const servo2Angle = ref(90)
+const PTZ_STEP = 5
+let ptzInterval: ReturnType<typeof setInterval> | null = null
 
-function sendCommand(cmd: RobotCommand) {
-  if (isConnected()) webSocketService.sendCommand(cmd)
+function sendCommand(cmd: RobotCommand, angle?: number) {
+  if (isConnected()) webSocketService.sendCommand(cmd, angle)
 }
 
 function onCallStateChange(state: 'idle' | 'connecting' | 'connected' | 'failed') {
@@ -63,20 +67,52 @@ function dirToCommand(dir: string): RobotCommand {
   return 'stop'
 }
 
-function handleDirDown(dir: string) {
+// PTZ servo control (WASD / on-screen buttons)
+function ptzAdjust(dir: string) {
+  if (dir === 'up' || dir === 'w') {
+    servo1Angle.value = Math.min(180, servo1Angle.value + PTZ_STEP)
+    sendCommand('servo1', servo1Angle.value)
+  } else if (dir === 'down' || dir === 's') {
+    servo1Angle.value = Math.max(0, servo1Angle.value - PTZ_STEP)
+    sendCommand('servo1', servo1Angle.value)
+  } else if (dir === 'left' || dir === 'a') {
+    servo2Angle.value = Math.max(0, servo2Angle.value - PTZ_STEP)
+    sendCommand('servo2', servo2Angle.value)
+  } else if (dir === 'right' || dir === 'd') {
+    servo2Angle.value = Math.min(180, servo2Angle.value + PTZ_STEP)
+    sendCommand('servo2', servo2Angle.value)
+  }
+}
+
+function handlePtzDown(dir: string) {
+  if (!isConnected()) return
+  ptzAdjust(dir)
+  if (ptzInterval) clearInterval(ptzInterval)
+  ptzInterval = setInterval(() => ptzAdjust(dir), 100)
+}
+
+function handlePtzUp() {
+  if (ptzInterval) {
+    clearInterval(ptzInterval)
+    ptzInterval = null
+  }
+}
+
+// Movement control (Arrow keys / on-screen buttons)
+function handleMoveDown(dir: string) {
   if (!isConnected()) return
   pressedDir.value = dir
   sendCommand(dirToCommand(dir))
 }
 
-function handleDirUp() {
+function handleMoveUp() {
   if (pressedDir.value) {
     sendCommand('stop')
     pressedDir.value = null
   }
 }
 
-function handlePadLeave() {
+function handleMoveLeave() {
   if (pressedDir.value) {
     sendCommand('stop')
     pressedDir.value = null
@@ -88,17 +124,19 @@ function onKeyDown(e: KeyboardEvent) {
   if (!isConnected() || e.repeat) return
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault()
   const key = e.key.toLowerCase()
-  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+
+  // WASD → PTZ servo control
+  if (['w', 'a', 's', 'd'].includes(key)) {
     activeKeys.value = { ...activeKeys.value, [key]: true }
-    if (key === 'w') pressedDir.value = 'w'
-    if (key === 's') pressedDir.value = 's'
-    if (key === 'a') pressedDir.value = 'a'
-    if (key === 'd') pressedDir.value = 'd'
-    if (key === 'arrowup') pressedDir.value = 'arrowup'
-    if (key === 'arrowdown') pressedDir.value = 'arrowdown'
-    if (key === 'arrowleft') pressedDir.value = 'arrowleft'
-    if (key === 'arrowright') pressedDir.value = 'arrowright'
-    const map: Record<string, string> = { w: 'up', a: 'left', s: 'down', d: 'right', arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right' }
+    ptzAdjust(key)
+    if (ptzInterval) clearInterval(ptzInterval)
+    ptzInterval = setInterval(() => ptzAdjust(key), 100)
+  }
+  // Arrow keys → motor movement
+  else if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+    activeKeys.value = { ...activeKeys.value, [key]: true }
+    const map: Record<string, string> = { arrowup: 'up', arrowdown: 'down', arrowleft: 'left', arrowright: 'right' }
+    pressedDir.value = map[key]
     sendCommand(dirToCommand(map[key]))
   }
 }
@@ -106,7 +144,18 @@ function onKeyDown(e: KeyboardEvent) {
 function onKeyUp(e: KeyboardEvent) {
   if (!isConnected()) return
   const key = e.key.toLowerCase()
-  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+
+  // WASD → stop PTZ if no WASD keys held
+  if (['w', 'a', 's', 'd'].includes(key)) {
+    activeKeys.value = { ...activeKeys.value, [key]: false }
+    const anyPtzHeld = ['w', 'a', 's', 'd'].some(k => activeKeys.value[k])
+    if (!anyPtzHeld && ptzInterval) {
+      clearInterval(ptzInterval)
+      ptzInterval = null
+    }
+  }
+  // Arrow keys → stop motor
+  else if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
     activeKeys.value = { ...activeKeys.value, [key]: false }
     pressedDir.value = null
     sendCommand('stop')
@@ -169,7 +218,7 @@ onUnmounted(() => {
       <!-- PTZ (WASD) -->
       <div class="flex flex-col items-center gap-3 p-5 bg-[#141414] rounded-2xl border border-[#2A2A2A]">
         <h3 class="text-[13px] font-medium text-neutral-400 w-full text-left">云台控制 (WSAD)</h3>
-        <div class="grid grid-cols-3 gap-2 w-full max-w-[200px]" @mouseleave="handlePadLeave">
+        <div class="grid grid-cols-3 gap-2 w-full max-w-[200px]" @mouseleave="handlePtzUp">
           <div />
           <button
             :disabled="!isConnected()"
@@ -177,8 +226,8 @@ onUnmounted(() => {
               'w-full aspect-square rounded-xl flex items-center justify-center transition-all select-none border text-lg font-bold font-mono',
               activeKeys['w'] ? 'bg-blue-600 text-white border-transparent' : 'bg-[#222] hover:bg-[#333] active:bg-blue-600 active:text-white disabled:opacity-30 disabled:bg-[#1A1A1A] disabled:text-neutral-600 disabled:border-[#2A2A2A] border-transparent text-neutral-300',
             ]"
-            @mousedown="handleDirDown('up')"
-            @mouseup="handleDirUp"
+            @mousedown="handlePtzDown('w')"
+            @mouseup="handlePtzUp"
           >W</button>
           <div />
           <button
@@ -187,8 +236,8 @@ onUnmounted(() => {
               'w-full aspect-square rounded-xl flex items-center justify-center transition-all select-none border text-lg font-bold font-mono',
               activeKeys['a'] ? 'bg-blue-600 text-white border-transparent' : 'bg-[#222] hover:bg-[#333] active:bg-blue-600 active:text-white disabled:opacity-30 disabled:bg-[#1A1A1A] disabled:text-neutral-600 disabled:border-[#2A2A2A] border-transparent text-neutral-300',
             ]"
-            @mousedown="handleDirDown('left')"
-            @mouseup="handleDirUp"
+            @mousedown="handlePtzDown('a')"
+            @mouseup="handlePtzUp"
           >A</button>
           <button
             :disabled="!isConnected()"
@@ -196,8 +245,8 @@ onUnmounted(() => {
               'w-full aspect-square rounded-xl flex items-center justify-center transition-all select-none border text-lg font-bold font-mono',
               activeKeys['s'] ? 'bg-blue-600 text-white border-transparent' : 'bg-[#222] hover:bg-[#333] active:bg-blue-600 active:text-white disabled:opacity-30 disabled:bg-[#1A1A1A] disabled:text-neutral-600 disabled:border-[#2A2A2A] border-transparent text-neutral-300',
             ]"
-            @mousedown="handleDirDown('down')"
-            @mouseup="handleDirUp"
+            @mousedown="handlePtzDown('s')"
+            @mouseup="handlePtzUp"
           >S</button>
           <button
             :disabled="!isConnected()"
@@ -205,8 +254,8 @@ onUnmounted(() => {
               'w-full aspect-square rounded-xl flex items-center justify-center transition-all select-none border text-lg font-bold font-mono',
               activeKeys['d'] ? 'bg-blue-600 text-white border-transparent' : 'bg-[#222] hover:bg-[#333] active:bg-blue-600 active:text-white disabled:opacity-30 disabled:bg-[#1A1A1A] disabled:text-neutral-600 disabled:border-[#2A2A2A] border-transparent text-neutral-300',
             ]"
-            @mousedown="handleDirDown('right')"
-            @mouseup="handleDirUp"
+            @mousedown="handlePtzDown('d')"
+            @mouseup="handlePtzUp"
           >D</button>
         </div>
       </div>
@@ -214,7 +263,7 @@ onUnmounted(() => {
       <!-- Movement (Arrow Keys) -->
       <div class="flex flex-col items-center gap-3 p-5 bg-[#141414] rounded-2xl border border-[#2A2A2A]">
         <h3 class="text-[13px] font-medium text-neutral-400 w-full text-left">移动控制 (方向键)</h3>
-        <div class="grid grid-cols-3 gap-2 w-full max-w-[200px]" @mouseleave="handlePadLeave">
+        <div class="grid grid-cols-3 gap-2 w-full max-w-[200px]" @mouseleave="handleMoveLeave">
           <div />
           <button
             :disabled="!isConnected()"
@@ -222,8 +271,8 @@ onUnmounted(() => {
               'w-full aspect-square rounded-xl flex items-center justify-center transition-all select-none border',
               activeKeys['arrowup'] ? 'bg-blue-600 text-white border-transparent' : 'bg-[#222] hover:bg-[#333] active:bg-blue-600 active:text-white disabled:opacity-30 disabled:bg-[#1A1A1A] disabled:text-neutral-600 disabled:border-[#2A2A2A] border-transparent text-neutral-300',
             ]"
-            @mousedown="handleDirDown('up')"
-            @mouseup="handleDirUp"
+            @mousedown="handleMoveDown('up')"
+            @mouseup="handleMoveUp"
           >
             <ArrowUp class="w-5 h-5" />
           </button>
@@ -234,8 +283,8 @@ onUnmounted(() => {
               'w-full aspect-square rounded-xl flex items-center justify-center transition-all select-none border',
               activeKeys['arrowleft'] ? 'bg-blue-600 text-white border-transparent' : 'bg-[#222] hover:bg-[#333] active:bg-blue-600 active:text-white disabled:opacity-30 disabled:bg-[#1A1A1A] disabled:text-neutral-600 disabled:border-[#2A2A2A] border-transparent text-neutral-300',
             ]"
-            @mousedown="handleDirDown('left')"
-            @mouseup="handleDirUp"
+            @mousedown="handleMoveDown('left')"
+            @mouseup="handleMoveUp"
           >
             <ArrowLeft class="w-5 h-5" />
           </button>
@@ -245,8 +294,8 @@ onUnmounted(() => {
               'w-full aspect-square rounded-xl flex items-center justify-center transition-all select-none border',
               activeKeys['arrowdown'] ? 'bg-blue-600 text-white border-transparent' : 'bg-[#222] hover:bg-[#333] active:bg-blue-600 active:text-white disabled:opacity-30 disabled:bg-[#1A1A1A] disabled:text-neutral-600 disabled:border-[#2A2A2A] border-transparent text-neutral-300',
             ]"
-            @mousedown="handleDirDown('down')"
-            @mouseup="handleDirUp"
+            @mousedown="handleMoveDown('down')"
+            @mouseup="handleMoveUp"
           >
             <ArrowDown class="w-5 h-5" />
           </button>
@@ -256,8 +305,8 @@ onUnmounted(() => {
               'w-full aspect-square rounded-xl flex items-center justify-center transition-all select-none border',
               activeKeys['arrowright'] ? 'bg-blue-600 text-white border-transparent' : 'bg-[#222] hover:bg-[#333] active:bg-blue-600 active:text-white disabled:opacity-30 disabled:bg-[#1A1A1A] disabled:text-neutral-600 disabled:border-[#2A2A2A] border-transparent text-neutral-300',
             ]"
-            @mousedown="handleDirDown('right')"
-            @mouseup="handleDirUp"
+            @mousedown="handleMoveDown('right')"
+            @mouseup="handleMoveUp"
           >
             <ArrowRight class="w-5 h-5" />
           </button>

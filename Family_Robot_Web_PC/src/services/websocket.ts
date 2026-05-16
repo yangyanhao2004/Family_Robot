@@ -6,7 +6,9 @@ export type RobotCommand =
   | 'left'
   | 'right'
   | 'stop'
-  | 'take_photo';
+  | 'take_photo'
+  | 'servo1'
+  | 'servo2';
 
 export type WebRTCSignalType = 'offer' | 'answer' | 'candidate';
 
@@ -121,11 +123,11 @@ class WebSocketService {
     this.listeners.delete(listener);
   }
 
-  sendCommand(command: RobotCommand): void {
+  sendCommand(command: RobotCommand, angle?: number): void {
     if (!this.isConnected() || !this.isRegistered) return;
     this.sendRaw({
       type: 'command',
-      payload: { command },
+      payload: { command, angle },
     });
   }
 

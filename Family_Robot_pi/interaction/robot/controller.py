@@ -21,6 +21,8 @@ SUPPORTED_COMMANDS = (
     "left",
     "right",
     "stop",
+    "servo1",
+    "servo2",
 )
 
 _MOTION_COMMANDS = {"forward", "backward", "left", "right"}
@@ -50,7 +52,7 @@ class RobotController:
         self._state = _RobotState()
         self._lock = Lock()
 
-    def execute_command(self, command: str) -> bool:
+    def execute_command(self, command: str, angle: float = 0.0) -> bool:
         """
         Execute one remote command.
 

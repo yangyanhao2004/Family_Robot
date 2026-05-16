@@ -167,8 +167,9 @@ class PiWebSocketClient:
         if message_type == "command":
             payload = data.get("payload") or {}
             command = payload.get("command")
-            if self.controller.execute_command(command):
-                logger.info("Executed command: %s", command)
+            angle = payload.get("angle", 90.0)
+            if self.controller.execute_command(command, float(angle)):
+                logger.info("Executed command: %s (angle=%.1f)", command, float(angle))
             else:
                 logger.warning(
                     "Unknown command: %s (supported: %s)",

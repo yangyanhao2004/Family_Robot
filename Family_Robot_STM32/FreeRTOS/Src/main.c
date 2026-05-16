@@ -122,6 +122,8 @@ typedef struct {
   uint8_t enabled;     /* 1=PID使能, 0=开环模式 */
 } PID_t;
 
+static void uart_printf(const char *fmt, ...);
+
 static void PID_Reset(PID_t *pid)
 {
   pid->err_sum  = 0.0f;
@@ -909,14 +911,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
           float target = atof(sep + 1);
           PID_SetTarget(&pid1, target);
           if (target == 0.0f) Motor_SetSpeed(0, 0);
-          PID_Report(1, &pid1);
         }
         else if (strcmp(cmd_buf, "V2") == 0)
         {
           float target = atof(sep + 1);
           PID_SetTarget(&pid2, target);
           if (target == 0.0f) Motor_SetSpeed(1, 0);
-          PID_Report(2, &pid2);
         }
         /* ---- 全局PID参数(KP/KI/KD) 同时设置两电机 ---- */
         else if (strcmp(cmd_buf, "KP") == 0)

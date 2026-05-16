@@ -165,7 +165,7 @@ class SerialRobotController:
     # Command execution  (called from asyncio event loop — keep it fast)
     # ------------------------------------------------------------------
 
-    def execute_command(self, command: str) -> bool:
+    def execute_command(self, command: str, angle: float = 0.0) -> bool:
         """Map a high-level command to STM32 UART protocol and send it."""
         if command == "stop":
             self._send_uart("V1=0\r\nV2=0\r\n")
@@ -186,6 +186,12 @@ class SerialRobotController:
             s1, s2 = self._turn_speed, -self._turn_speed
             self._send_uart(f"V1={s1:.1f}\r\nV2={s2:.1f}\r\n")
             self._is_moving = True
+        elif command == "servo1":
+            a = max(0.0, min(180.0, angle))
+            self._send_uart(f"S1={a:.0f}\r\n")
+        elif command == "servo2":
+            a = max(0.0, min(180.0, angle))
+            self._send_uart(f"S2={a:.0f}\r\n")
         else:
             return False
 
