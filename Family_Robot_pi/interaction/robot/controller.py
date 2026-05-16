@@ -21,13 +21,9 @@ SUPPORTED_COMMANDS = (
     "left",
     "right",
     "stop",
-    "light_on",
-    "light_off",
 )
 
 _MOTION_COMMANDS = {"forward", "backward", "left", "right"}
-_LIGHT_ON_COMMAND = "light_on"
-_LIGHT_OFF_COMMAND = "light_off"
 _STOP_COMMAND = "stop"
 
 
@@ -37,7 +33,6 @@ class _RobotState:
     is_running: bool = False
     temperature: float = 34.0
     signal_strength: int = 4
-    light_on: bool = False
     last_command: str = _STOP_COMMAND
     last_update_monotonic: float = field(default_factory=time.monotonic)
 
@@ -72,10 +67,6 @@ class RobotController:
                 self._state.is_running = True
             elif command == _STOP_COMMAND:
                 self._state.is_running = False
-            elif command == _LIGHT_ON_COMMAND:
-                self._state.light_on = True
-            elif command == _LIGHT_OFF_COMMAND:
-                self._state.light_on = False
 
         return True
 

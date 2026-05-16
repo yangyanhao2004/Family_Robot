@@ -110,7 +110,7 @@ export const api = {
 
   // ---- Admin ----
   getAdminUsers: () =>
-    request<{ userId: number; email: string; name: string; role: string; passwordHash: string; robotSerialNumbers: string[] }[]>('/api/admin/users'),
+    request<{ userId: number; email: string; name: string; role: string; password: string; robotSerialNumbers: string[] }[]>('/api/admin/users'),
 
   registerRobot: (serialNumber: string) =>
     request<{ message: string }>('/api/admin/robots', {

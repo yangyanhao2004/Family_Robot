@@ -12,6 +12,6 @@ public class AdminUserDto {
     private String email;
     private String name;
     private String role;
-    private String passwordHash;
+    private String password;
     private List<String> robotSerialNumbers;
 }

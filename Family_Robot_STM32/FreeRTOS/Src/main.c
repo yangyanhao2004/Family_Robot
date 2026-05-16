@@ -117,18 +117,39 @@ typedef struct {
   float  out;          /* PID输出(PWM值) */
   float  out_max;      /* 输出上限 */
   float  i_limit;      /* 积分限幅 */
+  float  deadband;     /* 死区: |error|小于此值时忽略, 防振荡 */
+  float  ramp;         /* 输出变化率限制(每周期最大增量, 0=不限) */
   uint8_t enabled;     /* 1=PID使能, 0=开环模式 */
 } PID_t;
+
+static void PID_Reset(PID_t *pid)
+{
+  pid->err_sum  = 0.0f;
+  pid->err_last = 0.0f;
+  pid->err      = 0.0f;
+}
+
+static void PID_Report(uint8_t id, PID_t *pid)
+{
+  uart_printf("PID%d: kp=%.3f ki=%.3f kd=%.3f target=%.1f out=%.1f "
+              "omax=%.0f ilim=%.0f db=%.1f ramp=%.1f en=%d\r\n",
+              id, (double)pid->kp, (double)pid->ki, (double)pid->kd,
+              (double)pid->target, (double)pid->out,
+              (double)pid->out_max, (double)pid->i_limit,
+              (double)pid->deadband, (double)pid->ramp, pid->enabled);
+}
 
 /* 两个电机的PID实例 */
 static PID_t pid1 = {
   .kp = 8.0f, .ki = 1.5f, .kd = 1.0f,
   .out_max = 999.0f, .i_limit = 300.0f,
+  .deadband = 0.0f, .ramp = 0.0f,
   .enabled = 0
 };
 static PID_t pid2 = {
   .kp = 8.0f, .ki = 1.5f, .kd = 1.0f,
   .out_max = 999.0f, .i_limit = 300.0f,
+  .deadband = 0.0f, .ramp = 0.0f,
   .enabled = 0
 };
 
@@ -140,8 +161,16 @@ static float PID_Calc(PID_t *pid, float actual)
 
   pid->err = pid->target - actual;
 
-  /* 积分限幅(防饱和) */
-  pid->err_sum += pid->err;
+  /* 死区: 忽略小误差, 防止负载下震荡 */
+  if (pid->deadband > 0.0f)
+  {
+    if (pid->err > -pid->deadband && pid->err < pid->deadband)
+      pid->err = 0.0f;
+  }
+
+  /* 积分抗饱和: 仅在误差较显著时累加; 积分限幅 */
+  if (pid->err > 0.001f || pid->err < -0.001f)
+    pid->err_sum += pid->err;
   if (pid->err_sum >  pid->i_limit) pid->err_sum =  pid->i_limit;
   if (pid->err_sum < -pid->i_limit) pid->err_sum = -pid->i_limit;
 
@@ -149,6 +178,14 @@ static float PID_Calc(PID_t *pid, float actual)
   float output = pid->kp * pid->err
                + pid->ki * pid->err_sum
                + pid->kd * (pid->err - pid->err_last);
+
+  /* 输出变化率限制(防突变, 保护驱动和机械) */
+  if (pid->ramp > 0.0f)
+  {
+    float delta = output - pid->out;
+    if (delta >  pid->ramp) output = pid->out + pid->ramp;
+    if (delta < -pid->ramp) output = pid->out - pid->ramp;
+  }
 
   /* 输出限幅 */
   if (output >  pid->out_max) output =  pid->out_max;
@@ -830,8 +867,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     {
       cmd_buf[cmd_idx] = '\0';
 
-      /* 解析指令: S1=angle / S2=angle / M1=speed / M2=speed
-       * 同时支持冒号分隔: S1:90 等价于 S1=90 */
+      /* 指令集: S1/S2=舵机角度 M1/M2=开环PWM V1/V2=PID速度目标
+       * KP/KI/KD=全局PID增益 KP1..RAMP2=单电机PID参数
+       * RP1/RP2=读回PID参数 RST1/RST2=复位积分
+       * 支持 = 或 : 分隔符 */
       char *sep = strchr(cmd_buf, '=');
       if (!sep) sep = strchr(cmd_buf, ':');
 
@@ -864,40 +903,131 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
           Motor_SetSpeed(1, speed);
           uart_printf("Motor2 -> %d\r\n", speed);
         }
+        /* ---- 速度闭环(V1/V2) ---- */
         else if (strcmp(cmd_buf, "V1") == 0)
         {
           float target = atof(sep + 1);
           PID_SetTarget(&pid1, target);
           if (target == 0.0f) Motor_SetSpeed(0, 0);
-          uart_printf("PID1 target=%.1f kp=%.2f ki=%.2f kd=%.2f\r\n",
-                      target, pid1.kp, pid1.ki, pid1.kd);
+          PID_Report(1, &pid1);
         }
         else if (strcmp(cmd_buf, "V2") == 0)
         {
           float target = atof(sep + 1);
           PID_SetTarget(&pid2, target);
           if (target == 0.0f) Motor_SetSpeed(1, 0);
-          uart_printf("PID2 target=%.1f kp=%.2f ki=%.2f kd=%.2f\r\n",
-                      target, pid2.kp, pid2.ki, pid2.kd);
+          PID_Report(2, &pid2);
         }
+        /* ---- 全局PID参数(KP/KI/KD) 同时设置两电机 ---- */
         else if (strcmp(cmd_buf, "KP") == 0)
         {
-          /* KP=8.0  同时设置两个电机的kp */
           float v = atof(sep + 1);
           pid1.kp = pid2.kp = v;
-          uart_printf("kp=%.3f\r\n", v);
+          uart_printf("kp=%.3f\r\n", (double)v);
         }
         else if (strcmp(cmd_buf, "KI") == 0)
         {
           float v = atof(sep + 1);
           pid1.ki = pid2.ki = v;
-          uart_printf("ki=%.3f\r\n", v);
+          uart_printf("ki=%.3f\r\n", (double)v);
         }
         else if (strcmp(cmd_buf, "KD") == 0)
         {
           float v = atof(sep + 1);
           pid1.kd = pid2.kd = v;
-          uart_printf("kd=%.3f\r\n", v);
+          uart_printf("kd=%.3f\r\n", (double)v);
+        }
+        /* ---- 电机1独立PID参数 ---- */
+        else if (strcmp(cmd_buf, "KP1") == 0)
+        {
+          pid1.kp = atof(sep + 1);
+          uart_printf("kp1=%.3f\r\n", (double)pid1.kp);
+        }
+        else if (strcmp(cmd_buf, "KI1") == 0)
+        {
+          pid1.ki = atof(sep + 1);
+          uart_printf("ki1=%.3f\r\n", (double)pid1.ki);
+        }
+        else if (strcmp(cmd_buf, "KD1") == 0)
+        {
+          pid1.kd = atof(sep + 1);
+          uart_printf("kd1=%.3f\r\n", (double)pid1.kd);
+        }
+        else if (strcmp(cmd_buf, "IMAX1") == 0)
+        {
+          pid1.i_limit = atof(sep + 1);
+          uart_printf("ilim1=%.1f\r\n", (double)pid1.i_limit);
+        }
+        else if (strcmp(cmd_buf, "OMAX1") == 0)
+        {
+          pid1.out_max = atof(sep + 1);
+          uart_printf("omax1=%.1f\r\n", (double)pid1.out_max);
+        }
+        else if (strcmp(cmd_buf, "DB1") == 0)
+        {
+          pid1.deadband = atof(sep + 1);
+          uart_printf("db1=%.1f\r\n", (double)pid1.deadband);
+        }
+        else if (strcmp(cmd_buf, "RAMP1") == 0)
+        {
+          pid1.ramp = atof(sep + 1);
+          uart_printf("ramp1=%.1f\r\n", (double)pid1.ramp);
+        }
+        /* ---- 电机2独立PID参数 ---- */
+        else if (strcmp(cmd_buf, "KP2") == 0)
+        {
+          pid2.kp = atof(sep + 1);
+          uart_printf("kp2=%.3f\r\n", (double)pid2.kp);
+        }
+        else if (strcmp(cmd_buf, "KI2") == 0)
+        {
+          pid2.ki = atof(sep + 1);
+          uart_printf("ki2=%.3f\r\n", (double)pid2.ki);
+        }
+        else if (strcmp(cmd_buf, "KD2") == 0)
+        {
+          pid2.kd = atof(sep + 1);
+          uart_printf("kd2=%.3f\r\n", (double)pid2.kd);
+        }
+        else if (strcmp(cmd_buf, "IMAX2") == 0)
+        {
+          pid2.i_limit = atof(sep + 1);
+          uart_printf("ilim2=%.1f\r\n", (double)pid2.i_limit);
+        }
+        else if (strcmp(cmd_buf, "OMAX2") == 0)
+        {
+          pid2.out_max = atof(sep + 1);
+          uart_printf("omax2=%.1f\r\n", (double)pid2.out_max);
+        }
+        else if (strcmp(cmd_buf, "DB2") == 0)
+        {
+          pid2.deadband = atof(sep + 1);
+          uart_printf("db2=%.1f\r\n", (double)pid2.deadband);
+        }
+        else if (strcmp(cmd_buf, "RAMP2") == 0)
+        {
+          pid2.ramp = atof(sep + 1);
+          uart_printf("ramp2=%.1f\r\n", (double)pid2.ramp);
+        }
+        /* ---- 读回全部PID参数(RP1/RP2) ---- */
+        else if (strcmp(cmd_buf, "RP1") == 0)
+        {
+          PID_Report(1, &pid1);
+        }
+        else if (strcmp(cmd_buf, "RP2") == 0)
+        {
+          PID_Report(2, &pid2);
+        }
+        /* ---- 复位积分累加器(RST1/RST2) ---- */
+        else if (strcmp(cmd_buf, "RST1") == 0)
+        {
+          PID_Reset(&pid1);
+          uart_printf("PID1 integral reset\r\n");
+        }
+        else if (strcmp(cmd_buf, "RST2") == 0)
+        {
+          PID_Reset(&pid2);
+          uart_printf("PID2 integral reset\r\n");
         }
         else
         {

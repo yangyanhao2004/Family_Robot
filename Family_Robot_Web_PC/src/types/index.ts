@@ -12,8 +12,6 @@ export type RobotCommand =
   | 'left'
   | 'right'
   | 'stop'
-  | 'light_on'
-  | 'light_off'
 
 export interface Notification {
   id: string

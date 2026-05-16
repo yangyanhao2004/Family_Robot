@@ -6,8 +6,6 @@ export type RobotCommand =
   | 'left'
   | 'right'
   | 'stop'
-  | 'light_on'
-  | 'light_off'
   | 'take_photo';
 
 export type WebRTCSignalType = 'offer' | 'answer' | 'candidate';

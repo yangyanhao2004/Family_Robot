@@ -23,7 +23,7 @@ async def handle_command_message(message: Dict[str, Any]) -> bool:
             await _handle_take_photo()
             return False  # handled locally, don't forward to Pi
 
-        # Movement/light commands need Pi
+        # Movement commands need Pi
         if not manager.is_pi_connected():
             await manager.send_to_web(ErrorMessage(
                 type="error", message="Robot not connected"

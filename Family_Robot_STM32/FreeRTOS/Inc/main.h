@@ -94,15 +94,30 @@ void Motor_SetSpeed(uint8_t motor_id, int16_t speed);
 int32_t Encoder_GetCount(uint8_t encoder_id);
 
 /* ===== 串口指令速查 ===== */
-/* M1=<pwm>   开环控制电机1, pwm范围-999~999 (自动关闭PID)        */
-/* M2=<pwm>   开环控制电机2                                        */
-/* V1=<speed> PID闭环控制电机1, speed单位=脉冲/10ms (正负代表方向) */
-/* V2=<speed> PID闭环控制电机2                                     */
-/* KP=<val>   同时设置两路PID的Kp                                  */
-/* KI=<val>   同时设置两路PID的Ki                                  */
-/* KD=<val>   同时设置两路PID的Kd                                  */
-/* S1=<deg>   设置舵机1角度 0~180                                   */
-/* S2=<deg>   设置舵机2角度 0~180                                   */
+/* ── 舵机 ── */
+/* S1=<deg>      设置舵机1角度 0~180                                   */
+/* S2=<deg>      设置舵机2角度 0~180                                   */
+/* ── 开环PWM ── */
+/* M1=<pwm>      开环控制电机1, pwm范围-999~999 (自动关闭PID)          */
+/* M2=<pwm>      开环控制电机2                                        */
+/* ── PID闭环速度 ── */
+/* V1=<speed>    PID闭环电机1, speed=脉冲/10ms (正/负代表方向)         */
+/* V2=<speed>    PID闭环电机2                                        */
+/* ── 全局PID参数(同时设置两电机) ── */
+/* KP/KI/KD=<v>  同时设置两电机Kp/Ki/Kd                               */
+/* ── 电机1独立PID参数 ── */
+/* KP1/KI1/KD1   电机1的Kp/Ki/Kd                                      */
+/* IMAX1/OMAX1   积分限幅/输出限幅 (默认300/999)                       */
+/* DB1           死区, |error|<DB1时忽略 (默认0, 防振荡)              */
+/* RAMP1         输出变化率限制(每10ms), 0=不限 (默认0, 防突变)       */
+/* ── 电机2独立PID参数 ── */
+/* KP2/KI2/KD2   电机2的Kp/Ki/Kd                                      */
+/* IMAX2/OMAX2   积分限幅/输出限幅 (默认300/999)                       */
+/* DB2           死区                                                 */
+/* RAMP2         输出变化率限制                                        */
+/* ── 调试命令 ── */
+/* RP1/RP2       读回电机1/2全部PID参数                                */
+/* RST1/RST2     复位电机1/2积分累加器                                 */
 
 /* USER CODE END Private defines */
 

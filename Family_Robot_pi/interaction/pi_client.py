@@ -7,7 +7,7 @@ from typing import Callable, Optional
 import websockets
 from websockets.exceptions import ConnectionClosed
 
-from .robot import SUPPORTED_COMMANDS, RobotController
+from .robot import SUPPORTED_COMMANDS, RobotController, SerialRobotController
 from .webrtc_call import PiWebRTCCallBridge
 from senses.camera_streamer import CameraStreamer
 
@@ -82,7 +82,22 @@ class PiWebSocketClient:
         self.ws_url = ws_url or _build_ws_url()
         self.reconnect_interval = reconnect_interval
         self.status_interval = status_interval
-        self.controller = controller or RobotController()
+
+        # Prefer real STM32 serial link; fall back to software simulator.
+        if controller is not None:
+            self.controller = controller
+        else:
+            serial_ctrl = SerialRobotController(
+                forward_speed=_env_float("FAMILY_ROBOT_FORWARD_SPEED", 50.0),
+                turn_speed=_env_float("FAMILY_ROBOT_TURN_SPEED", 30.0),
+            )
+            if serial_ctrl.open():
+                self.controller = serial_ctrl
+                logger.info("Using SerialRobotController (STM32 hardware)")
+            else:
+                self.controller = RobotController()
+                logger.info("Using RobotController (software simulator)")
+
         self._running = True
 
         self.camera_enabled = camera_enabled
@@ -123,6 +138,8 @@ class PiWebSocketClient:
 
     def stop(self):
         self._running = False
+        if hasattr(self.controller, "close"):
+            self.controller.close()
         if self.camera_streamer is not None:
             self.camera_streamer.stop()
 

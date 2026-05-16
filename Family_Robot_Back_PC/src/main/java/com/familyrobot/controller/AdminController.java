@@ -6,6 +6,7 @@ import com.familyrobot.model.entity.Robot;
 import com.familyrobot.model.entity.User;
 import com.familyrobot.repository.RobotRepository;
 import com.familyrobot.repository.UserRepository;
+import com.familyrobot.security.AesPasswordEncoder;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ public class AdminController {
 
     private final UserRepository userRepository;
     private final RobotRepository robotRepository;
+    private final AesPasswordEncoder aesPasswordEncoder;
 
     private void requireAdmin(User user) {
         if (!"Admin".equals(user.getRole())) {
@@ -44,7 +46,7 @@ public class AdminController {
                         .email(u.getEmail())
                         .name(u.getName())
                         .role(u.getRole())
-                        .passwordHash(u.getPasswordHash())
+                        .password(aesPasswordEncoder.decrypt(u.getPassword()))
                         .robotSerialNumbers(robots.stream()
                                 .filter(r -> r.getUser() != null && r.getUser().getId().equals(u.getId()))
                                 .map(Robot::getSerialNumber)

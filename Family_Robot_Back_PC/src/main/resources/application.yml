@@ -48,6 +48,8 @@ app:
   jwt:
     secret: ${JWT_SECRET:family-robot-jwt-secret-key-change-in-production-256bits}
     expiration-ms: ${JWT_EXPIRATION:86400000}
+  aes:
+    secret-key: ${AES_SECRET:family-robot-aes-secret-key-change-in-production-256bits}
 
 logging:
   level:

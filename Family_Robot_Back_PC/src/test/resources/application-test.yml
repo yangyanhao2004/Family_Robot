@@ -16,3 +16,5 @@ app:
   jwt:
     secret: test-secret-key-for-unit-tests-256bits-long
     expiration-ms: 3600000
+  aes:
+    secret-key: test-aes-secret-key-for-unit-tests-256bits

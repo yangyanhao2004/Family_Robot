@@ -1,21 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { api } from '@/services/api'
-import { Eye, EyeOff } from 'lucide-vue-next'
 
 interface AdminUser {
   userId: number
   email: string
   name: string
   role: string
-  passwordHash: string
+  password: string
   robotSerialNumbers: string[]
 }
 
 const users = ref<AdminUser[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
-const visibleHashes = ref<Set<number>>(new Set())
 
 onMounted(async () => {
   try {
@@ -26,14 +24,6 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
-function toggleHash(userId: number) {
-  if (visibleHashes.value.has(userId)) {
-    visibleHashes.value.delete(userId)
-  } else {
-    visibleHashes.value.add(userId)
-  }
-}
 </script>
 
 <template>
@@ -72,22 +62,10 @@ function toggleHash(userId: number) {
             </span>
           </div>
 
-          <!-- Password hash -->
+          <!-- Password -->
           <div class="bg-[#0D0D0D] rounded p-3 mb-3">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-xs text-neutral-500 font-medium uppercase tracking-wider">Password Hash (BCrypt)</span>
-              <button
-                class="text-xs text-neutral-400 hover:text-white transition-colors flex items-center gap-1"
-                @click="toggleHash(user.userId)"
-              >
-                <Eye v-if="!visibleHashes.has(user.userId)" class="w-3.5 h-3.5" />
-                <EyeOff v-else class="w-3.5 h-3.5" />
-                {{ visibleHashes.has(user.userId) ? 'Hide' : 'Show' }}
-              </button>
-            </div>
-            <p class="text-xs text-neutral-300 font-mono break-all">
-              {{ visibleHashes.has(user.userId) ? user.passwordHash : '••••••••••••••••••••••••••••••••••••••••••••••••' }}
-            </p>
+            <span class="text-xs text-neutral-500 font-medium uppercase tracking-wider">Password</span>
+            <p class="text-sm text-neutral-300 font-mono mt-1">{{ user.password }}</p>
           </div>
 
           <!-- Robots -->
