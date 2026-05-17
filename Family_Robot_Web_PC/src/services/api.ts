@@ -18,6 +18,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   })
   if (!res.ok) {
+    // 401 on protected endpoints → token expired, force re-login
+    if (res.status === 401 && !path.startsWith('/api/auth/')) {
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('auth_role')
+      window.location.hash = '#/login'
+      throw new Error('登录已过期，请重新登录')
+    }
     let message = `${options?.method || 'GET'} ${path} failed (${res.status})`
     try {
       const body = await res.json()
@@ -25,7 +32,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         message = body.message
       }
     } catch {
-      // response is not JSON, use raw text
       const text = await res.text()
       if (text) message = text
     }

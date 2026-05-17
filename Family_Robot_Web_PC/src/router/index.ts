@@ -69,7 +69,9 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, _from, next) => {
+let tokenVerified = false
+
+router.beforeEach(async (to, _from, next) => {
   const token = localStorage.getItem('auth_token')
   const role = localStorage.getItem('auth_role')
 
@@ -82,6 +84,21 @@ router.beforeEach((to, _from, next) => {
       next({ name: 'adminUsers' })
     } else {
       next({ name: 'dashboard' })
+    }
+  } else if (to.meta.requiresAuth && token && !tokenVerified) {
+    // Verify token on first protected navigation
+    try {
+      const BASE = (import.meta as any).env.VITE_JAVA_API_URL || 'http://localhost:8090'
+      const res = await fetch(`${BASE.replace(/\/$/, '')}/api/users/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('token invalid')
+      tokenVerified = true
+      next()
+    } catch {
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('auth_role')
+      next({ name: 'login' })
     }
   } else {
     next()
