@@ -44,8 +44,62 @@ function selectAll() {
   }
 }
 
-function downloadPhoto(url: string) {
-  window.open(url, '_blank')
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => {
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, 100)
+}
+
+function downloadViaCanvas(img: HTMLImageElement, filename: string) {
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(img, 0, 0)
+  canvas.toBlob((blob) => {
+    if (blob) downloadBlob(blob, filename)
+    else window.open(img.src, '_blank')
+  }, 'image/jpeg', 0.92)
+}
+
+async function downloadFile(url: string, filename: string) {
+  // Try fetch first for maximum quality
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const blob = await res.blob()
+    downloadBlob(blob, filename)
+    return
+  } catch {
+    // fetch failed — try canvas method with CORS image load
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => downloadViaCanvas(img, filename)
+    img.onerror = () => window.open(url, '_blank')
+    img.src = url
+  }
+}
+
+function downloadPhoto(photo: AlbumPhoto) {
+  const filename = photo.url.split('/').pop() || `${photo.id}.jpg`
+  downloadFile(fullUrl(photo.url), filename)
+}
+
+async function downloadSelected() {
+  for (const id of selected.value) {
+    const photo = photos.value.find((p) => p.id === id)
+    if (!photo) continue
+    downloadFile(fullUrl(photo.url), photo.url.split('/').pop() || `${id}.jpg`)
+    await new Promise((r) => setTimeout(r, 300))
+  }
 }
 </script>
 
@@ -63,6 +117,13 @@ function downloadPhoto(url: string) {
             @click="selectAll"
           >
             {{ selected.length === photos.length ? 'Deselect All' : 'Select All' }}
+          </button>
+          <button
+            v-if="selected.length"
+            class="px-3 py-1.5 text-xs text-blue-400 hover:text-blue-300 border border-blue-500/30 rounded flex items-center gap-1 transition-colors"
+            @click="downloadSelected"
+          >
+            <Download class="w-3 h-3" /> Download
           </button>
           <button
             v-if="selected.length"
@@ -113,7 +174,7 @@ function downloadPhoto(url: string) {
 
         <button
           class="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          @click.stop="downloadPhoto(fullUrl(photo.url))"
+          @click.stop="downloadPhoto(photo)"
         >
           <Download class="w-3.5 h-3.5 text-white" />
         </button>

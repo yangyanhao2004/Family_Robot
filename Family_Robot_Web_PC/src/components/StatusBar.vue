@@ -26,11 +26,11 @@ const textMuted = computed(() =>
   store.connectionStatus === 'connected' ? 'text-neutral-400' : 'text-neutral-500'
 )
 
-const speedLabel = computed(() => {
-  if (store.speedLevel === 'low') return '低速'
-  if (store.speedLevel === 'high') return '高速'
-  return '中速'
-})
+const speedOptions = [
+  { value: 'low' as const, label: '低速', color: 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10', activeColor: 'bg-emerald-500 text-white border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' },
+  { value: 'medium' as const, label: '中速', color: 'border-amber-500/40 text-amber-400 bg-amber-500/10', activeColor: 'bg-amber-500 text-white border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]' },
+  { value: 'high' as const, label: '高速', color: 'border-rose-500/40 text-rose-400 bg-rose-500/10', activeColor: 'bg-rose-500 text-white border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]' },
+]
 
 function setSpeed(level: 'low' | 'medium' | 'high') {
   store.speedLevel = level
@@ -60,18 +60,19 @@ function setSpeed(level: 'low' | 'medium' | 'high') {
     <div :class="['flex items-center gap-8', textMuted]">
       <div class="flex items-center gap-2">
         <Gauge class="w-4 h-4" />
-        <span>速度:</span>
-        <select
-          :disabled="store.connectionStatus !== 'connected'"
-          :value="store.speedLevel"
-          @change="setSpeed(($event.target as HTMLSelectElement).value as 'low' | 'medium' | 'high')"
-          class="bg-transparent border border-neutral-700 rounded px-2 py-0.5 text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:border-blue-500"
-          :class="store.connectionStatus === 'connected' ? 'text-white' : ''"
-        >
-          <option value="low" class="bg-[#1A1A1A]">低速</option>
-          <option value="medium" class="bg-[#1A1A1A]">中速</option>
-          <option value="high" class="bg-[#1A1A1A]">高速</option>
-        </select>
+        <span>速度</span>
+        <div class="flex rounded-md overflow-hidden border border-neutral-700/50">
+          <button
+            v-for="opt in speedOptions"
+            :key="opt.value"
+            :disabled="store.connectionStatus !== 'connected'"
+            @click="setSpeed(opt.value)"
+            class="px-2.5 py-0.5 text-xs font-medium transition-all duration-150 disabled:opacity-30 disabled:cursor-not-allowed border-r border-neutral-700/50 last:border-r-0"
+            :class="store.speedLevel === opt.value && store.connectionStatus === 'connected' ? opt.activeColor : opt.color"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
       </div>
       <div class="flex items-center gap-2">
         <Battery class="w-4 h-4" />

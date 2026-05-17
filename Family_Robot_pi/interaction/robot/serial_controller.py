@@ -55,6 +55,53 @@ def _auto_detect_port() -> str | None:
     return None
 
 
+def _read_wifi_signal_strength() -> int | None:
+    """Read WiFi link quality from /proc/net/wireless, map to 1-5 scale.
+
+    Returns None when the interface file is unavailable (non-Linux or no WiFi).
+    """
+    if sys.platform != "linux":
+        return None
+    try:
+        with open("/proc/net/wireless", "r") as f:
+            lines = f.readlines()
+    except (OSError, PermissionError):
+        return None
+
+    # Format: Inter-| face | Quality | Discarded packets | ...
+    # Data:   wlan0: 0000   64.  -46.  -256   ...
+    for line in lines[2:]:  # skip 2 header lines
+        line = line.strip()
+        if not line or ":" not in line:
+            continue
+        iface, rest = line.split(":", 1)
+        parts = rest.strip().split()
+        # parts[0] = status flags, parts[1] = link quality (driver-dependent range)
+        if len(parts) < 2:
+            continue
+        try:
+            quality = float(parts[1].rstrip("."))
+        except ValueError:
+            continue
+
+        # Map link quality to 1-5.  Typical driver ranges: 0-70 (nl80211) or 0-100.
+        # We normalise assuming 0-70 scale and clamp.
+        pct = min(100.0, quality / 70.0 * 100.0)
+
+        if pct >= 80:
+            return 5
+        elif pct >= 60:
+            return 4
+        elif pct >= 40:
+            return 3
+        elif pct >= 20:
+            return 2
+        else:
+            return 1
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # SerialRobotController
 # ---------------------------------------------------------------------------
@@ -100,7 +147,6 @@ class SerialRobotController:
         # --- simulated battery / temperature (STM32 does not report these) ---
         self._battery: int = 95
         self._temperature: float = 34.0
-        self._signal_strength: int = 4
         self._last_status_update: float = time.monotonic()
 
     # ------------------------------------------------------------------
@@ -283,15 +329,20 @@ class SerialRobotController:
         """Return the backend-compatible status payload.
 
         Includes real encoder speeds from STM32 telemetry when available,
-        plus simulated battery / temperature / signal strength.
+        Wi-Fi signal strength read from /proc/net/wireless, plus simulated
+        battery / temperature.
         """
         self._evolve_status()
+
+        wifi_signal = _read_wifi_signal_strength()
+        if wifi_signal is None:
+            wifi_signal = 4  # fallback when /proc/net/wireless unavailable
 
         return {
             "battery": self._battery,
             "isRunning": self._is_moving,
             "temperature": round(self._temperature, 1),
-            "signalStrength": self._signal_strength,
+            "signalStrength": wifi_signal,
             # Extended fields — the frontend can use these for diagnostics
             "encoder1": self._encoder1,
             "encoder2": self._encoder2,
@@ -317,6 +368,3 @@ class SerialRobotController:
         delta = (target_temp - self._temperature) * min(0.35, max(0.05, elapsed))
         jitter = random.uniform(-0.2, 0.2)
         self._temperature = max(28.0, min(62.0, self._temperature + delta + jitter))
-
-        if random.random() < min(0.45, elapsed / 4.0):
-            self._signal_strength = max(1, min(5, self._signal_strength + random.choice([-1, 0, 1])))
