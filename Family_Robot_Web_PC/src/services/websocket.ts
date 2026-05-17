@@ -8,7 +8,10 @@ export type RobotCommand =
   | 'stop'
   | 'take_photo'
   | 'servo1'
-  | 'servo2';
+  | 'servo2'
+  | 'speed_low'
+  | 'speed_medium'
+  | 'speed_high';
 
 export type WebRTCSignalType = 'offer' | 'answer' | 'candidate';
 

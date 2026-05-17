@@ -9,6 +9,7 @@ export const useRobotStore = defineStore('robot', () => {
   const battery = ref<number | null>(null)
   const isRunning = ref(false)
   const signalStrength = ref<number | null>(null)
+  const speedLevel = ref<'low' | 'medium' | 'high'>('medium')
 
   const autoConnect = ref(true)
   const notifications = ref<Notification[]>([])
@@ -56,6 +57,7 @@ export const useRobotStore = defineStore('robot', () => {
     battery,
     isRunning,
     signalStrength,
+    speedLevel,
     autoConnect,
     notifications,
     needsCharging,

@@ -192,6 +192,15 @@ class SerialRobotController:
         elif command == "servo2":
             a = max(0.0, min(180.0, angle))
             self._send_uart(f"S2={a:.0f}\r\n")
+        elif command == "speed_low":
+            self._forward_speed = 25.0
+            self._turn_speed = 15.0
+        elif command == "speed_medium":
+            self._forward_speed = 50.0
+            self._turn_speed = 30.0
+        elif command == "speed_high":
+            self._forward_speed = 80.0
+            self._turn_speed = 50.0
         else:
             return False
 

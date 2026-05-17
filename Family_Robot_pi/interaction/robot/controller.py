@@ -23,6 +23,9 @@ SUPPORTED_COMMANDS = (
     "stop",
     "servo1",
     "servo2",
+    "speed_low",
+    "speed_medium",
+    "speed_high",
 )
 
 _MOTION_COMMANDS = {"forward", "backward", "left", "right"}

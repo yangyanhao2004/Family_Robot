@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRobotStore } from '@/stores/robotStore'
-import { Battery, Signal, Activity } from 'lucide-vue-next'
+import webSocketService from '@/services/websocket'
+import { Battery, Signal, Gauge } from 'lucide-vue-next'
 
 const store = useRobotStore()
 
@@ -25,7 +26,16 @@ const textMuted = computed(() =>
   store.connectionStatus === 'connected' ? 'text-neutral-400' : 'text-neutral-500'
 )
 
-const isRunning = computed(() => store.isRunning)
+const speedLabel = computed(() => {
+  if (store.speedLevel === 'low') return '低速'
+  if (store.speedLevel === 'high') return '高速'
+  return '中速'
+})
+
+function setSpeed(level: 'low' | 'medium' | 'high') {
+  store.speedLevel = level
+  webSocketService.sendCommand(`speed_${level}` as any)
+}
 </script>
 
 <template>
@@ -49,8 +59,19 @@ const isRunning = computed(() => store.isRunning)
 
     <div :class="['flex items-center gap-8', textMuted]">
       <div class="flex items-center gap-2">
-        <Activity class="w-4 h-4" />
-        <span>状态: <span :class="store.connectionStatus === 'connected' ? 'text-white' : ''">{{ isRunning ? '运行中' : '待机' }}</span></span>
+        <Gauge class="w-4 h-4" />
+        <span>速度:</span>
+        <select
+          :disabled="store.connectionStatus !== 'connected'"
+          :value="store.speedLevel"
+          @change="setSpeed(($event.target as HTMLSelectElement).value as 'low' | 'medium' | 'high')"
+          class="bg-transparent border border-neutral-700 rounded px-2 py-0.5 text-xs cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:border-blue-500"
+          :class="store.connectionStatus === 'connected' ? 'text-white' : ''"
+        >
+          <option value="low" class="bg-[#1A1A1A]">低速</option>
+          <option value="medium" class="bg-[#1A1A1A]">中速</option>
+          <option value="high" class="bg-[#1A1A1A]">高速</option>
+        </select>
       </div>
       <div class="flex items-center gap-2">
         <Battery class="w-4 h-4" />
