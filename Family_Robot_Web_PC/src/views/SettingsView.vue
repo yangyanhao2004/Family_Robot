@@ -9,7 +9,6 @@ const settings = ref<RobotSettings>({
   serialNumber: '',
 })
 const loading = ref(true)
-const saving = ref(false)
 const error = ref<string | null>(null)
 
 onMounted(async () => {
@@ -21,20 +20,6 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
-async function toggleAutoSave() {
-  if (saving.value) return
-  const previous = settings.value.autoSave
-  settings.value.autoSave = !settings.value.autoSave
-  saving.value = true
-  try {
-    await api.updateSettings({ autoSave: settings.value.autoSave })
-  } catch {
-    settings.value.autoSave = previous
-  } finally {
-    saving.value = false
-  }
-}
 </script>
 
 <template>
@@ -49,31 +34,6 @@ async function toggleAutoSave() {
     </div>
 
     <template v-else>
-      <!-- Auto-save toggle -->
-      <div class="flex items-center justify-between py-3 border-b border-[#2A2A2A]">
-        <div>
-          <p class="text-sm text-white font-medium">Auto-save</p>
-          <p class="text-xs text-neutral-500 mt-0.5">Automatically save captured photos</p>
-        </div>
-        <button
-          type="button"
-          :disabled="saving"
-          :class="[
-            'relative w-11 h-6 rounded-full transition-colors duration-200',
-            saving ? 'opacity-60' : '',
-            settings.autoSave ? 'bg-blue-600' : 'bg-[#3A3A3A]',
-          ]"
-          @click="toggleAutoSave"
-        >
-          <span
-            :class="[
-              'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200',
-              settings.autoSave ? 'translate-x-[1.375rem]' : 'translate-x-0.5',
-            ]"
-          />
-        </button>
-      </div>
-
       <!-- Device info -->
       <div class="space-y-3">
         <h4 class="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Device Info</h4>
