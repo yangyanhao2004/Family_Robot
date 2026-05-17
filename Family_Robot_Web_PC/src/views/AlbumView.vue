@@ -14,6 +14,7 @@ const photos = ref<AlbumPhoto[]>([])
 const selected = ref<string[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const downloading = ref(false)
 
 onMounted(async () => {
   try {
@@ -58,34 +59,52 @@ function downloadBlob(blob: Blob, filename: string) {
   }, 100)
 }
 
-function downloadViaCanvas(img: HTMLImageElement, filename: string) {
-  const canvas = document.createElement('canvas')
-  canvas.width = img.naturalWidth
-  canvas.height = img.naturalHeight
-  const ctx = canvas.getContext('2d')!
-  ctx.drawImage(img, 0, 0)
-  canvas.toBlob((blob) => {
-    if (blob) downloadBlob(blob, filename)
-    else window.open(img.src, '_blank')
-  }, 'image/jpeg', 0.92)
+function canvasBlob(img: HTMLImageElement): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = img.naturalWidth
+    canvas.height = img.naturalHeight
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(img, 0, 0)
+    canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.92)
+  })
 }
 
-async function downloadFile(url: string, filename: string) {
-  // Try fetch first for maximum quality
-  try {
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const blob = await res.blob()
-    downloadBlob(blob, filename)
-    return
-  } catch {
-    // fetch failed — try canvas method with CORS image load
+function loadImageCORS(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
-    img.onload = () => downloadViaCanvas(img, filename)
-    img.onerror = () => window.open(url, '_blank')
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Image load failed'))
     img.src = url
+  })
+}
+
+async function downloadFile(url: string, filename: string): Promise<boolean> {
+  // 1) Try fetch (original quality)
+  try {
+    const res = await fetch(url)
+    if (res.ok) {
+      downloadBlob(await res.blob(), filename)
+      return true
+    }
+  } catch {
+    // fetch failed, continue to canvas fallback
   }
+
+  // 2) Canvas fallback via CORS image load
+  try {
+    const img = await loadImageCORS(url)
+    const blob = await canvasBlob(img)
+    if (blob) {
+      downloadBlob(blob, filename)
+      return true
+    }
+  } catch {
+    // both methods failed
+  }
+
+  return false
 }
 
 function downloadPhoto(photo: AlbumPhoto) {
@@ -94,11 +113,22 @@ function downloadPhoto(photo: AlbumPhoto) {
 }
 
 async function downloadSelected() {
-  for (const id of selected.value) {
-    const photo = photos.value.find((p) => p.id === id)
-    if (!photo) continue
-    downloadFile(fullUrl(photo.url), photo.url.split('/').pop() || `${id}.jpg`)
-    await new Promise((r) => setTimeout(r, 300))
+  if (downloading.value) return
+  downloading.value = true
+  let failed = 0
+  try {
+    for (const id of selected.value) {
+      const photo = photos.value.find((p) => p.id === id)
+      if (!photo) continue
+      const ok = await downloadFile(fullUrl(photo.url), photo.url.split('/').pop() || `${id}.jpg`)
+      if (!ok) failed++
+      await new Promise((r) => setTimeout(r, 300))
+    }
+  } finally {
+    downloading.value = false
+    if (failed > 0) {
+      alert(`Download complete: ${selected.length - failed} succeeded, ${failed} failed.`)
+    }
   }
 }
 </script>
@@ -120,10 +150,13 @@ async function downloadSelected() {
           </button>
           <button
             v-if="selected.length"
-            class="px-3 py-1.5 text-xs text-blue-400 hover:text-blue-300 border border-blue-500/30 rounded flex items-center gap-1 transition-colors"
+            :disabled="downloading"
+            class="px-3 py-1.5 text-xs border rounded flex items-center gap-1 transition-colors"
+            :class="downloading ? 'text-neutral-500 border-neutral-700 cursor-not-allowed' : 'text-blue-400 hover:text-blue-300 border-blue-500/30'"
             @click="downloadSelected"
           >
-            <Download class="w-3 h-3" /> Download
+            <Download class="w-3 h-3" />
+            {{ downloading ? 'Downloading...' : 'Download' }}
           </button>
           <button
             v-if="selected.length"
