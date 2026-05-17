@@ -171,11 +171,11 @@ class SerialRobotController:
             self._send_uart("V1=0\r\nV2=0\r\n")
             self._is_moving = False
         elif command == "forward":
-            s = self._forward_speed
+            s = -self._forward_speed
             self._send_uart(f"V1={s:.1f}\r\nV2={s:.1f}\r\n")
             self._is_moving = True
         elif command == "backward":
-            s = -self._forward_speed
+            s = self._forward_speed
             self._send_uart(f"V1={s:.1f}\r\nV2={s:.1f}\r\n")
             self._is_moving = True
         elif command == "left":
