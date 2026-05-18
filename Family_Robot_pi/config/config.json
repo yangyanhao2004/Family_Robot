@@ -12,7 +12,7 @@
   "enable_local_llm_routing": false,
   "wake_word_name": "hey_jarvis",
   "wake_word_model": "",
-  "wake_word_threshold": 0.5,
+  "wake_word_threshold": 0.45,
   "mic_sample_rate": 48000,
   "mic_device_name": "USB PnP Sound Device",
   "speaker_device_name": "bcm2835 Headphones",

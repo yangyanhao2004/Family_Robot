@@ -47,8 +47,7 @@ public class ReminderService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email is required for EMAIL method");
         }
 
-        LocalDateTime scheduledTime = LocalDateTime.parse(req.getScheduledTime(),
-                DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+        LocalDateTime scheduledTime = parseReminderDateTime(req.getScheduledTime());
 
         Reminder reminder = Reminder.builder()
                 .userId(req.getUserId())
@@ -73,8 +72,7 @@ public class ReminderService {
 
         if (req.getText() != null) reminder.setText(req.getText());
         if (req.getScheduledTime() != null) {
-            reminder.setScheduledTime(LocalDateTime.parse(req.getScheduledTime(),
-                    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")));
+            reminder.setScheduledTime(parseReminderDateTime(req.getScheduledTime()));
         }
         if (req.getMethod() != null) reminder.setMethod(req.getMethod());
         if (req.getEmail() != null) reminder.setEmail(req.getEmail());
@@ -150,6 +148,17 @@ public class ReminderService {
             log.error("Voice reminder #{} failed: {}", r.getId(), e.getMessage());
             throw new RuntimeException(e);
         }
+    }
+
+    private static LocalDateTime parseReminderDateTime(String dt) {
+        if (dt == null || dt.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "scheduledTime is required");
+        }
+        // Normalize: HTML datetime-local input omits seconds, append ":00" if missing
+        if (dt.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}")) {
+            dt = dt + ":00";
+        }
+        return LocalDateTime.parse(dt, DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
     }
 
     @Scheduled(cron = "0 0 4 * * *")

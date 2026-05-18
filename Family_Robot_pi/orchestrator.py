@@ -402,13 +402,18 @@ class Orchestrator:
         """Process user query through router."""
         result = self._timed("route", lambda: self.router.route(text))
 
+        session = session_manager.get_or_create(PI_USER_ID)
+        session.add_message("user", text)
+
         if result.tool == ToolType.NONE:
             print("[dialogue] Direct chat response")
+            session.add_message("assistant", result.response)
             self._speak(result.response)
 
         elif result.tool == ToolType.TIME:
             print("[tool] get_current_time")
             response = get_current_time()
+            session.add_message("assistant", response)
             self._speak(response)
 
         elif result.tool == ToolType.WEATHER:
@@ -416,6 +421,7 @@ class Orchestrator:
                 location = result.arguments.get("location") or self.config.local_location
                 print(f"[tool] get_weather -> {location}")
                 response = self.weather.get_weather(location)
+                session.add_message("assistant", response)
                 self._speak(response)
             else:
                 self._speak("Sorry, weather lookup is not configured.")
@@ -425,6 +431,7 @@ class Orchestrator:
                 category = result.arguments.get("category", "")
                 print(f"[tool] get_news -> {category or 'general'}")
                 response = self.news.get_news(category)
+                session.add_message("assistant", response)
                 self._speak(response)
             else:
                 self._speak("Sorry, news lookup is not configured.")
@@ -432,11 +439,13 @@ class Orchestrator:
         elif result.tool == ToolType.SYSTEM_STATUS:
             print("[tool] get_system_status")
             response = get_system_status()
+            session.add_message("assistant", response)
             self._speak(response)
 
         elif result.tool == ToolType.JOKE:
             print("[tool] get_joke")
             response = get_joke()
+            session.add_message("assistant", response)
             self._speak(response)
 
         elif result.tool == ToolType.CLOUD:
@@ -452,7 +461,6 @@ class Orchestrator:
 
         try:
             session = session_manager.get_or_create(PI_USER_ID)
-            session.add_message("user", query)
 
             messages = []
             if self.cloud.soul_prompt:

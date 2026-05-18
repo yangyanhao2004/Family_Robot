@@ -50,7 +50,7 @@ app:
     expiration-ms: ${JWT_EXPIRATION:86400000}
   aes:
     secret-key: ${AES_SECRET:family-robot-aes-secret-key-change-in-production-256bits}
-  python-backend-url: ${PYTHON_BACKEND_URL:http://localhost:8080}
+  python-backend-url: ${PYTHON_BACKEND_URL:http://192.168.137.90:8080}
 
 logging:
   level:
