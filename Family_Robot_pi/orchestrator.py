@@ -422,7 +422,7 @@ class Orchestrator:
             self._speak(response)
 
         elif result.tool == ToolType.CLOUD:
-            print("[cloud kimi-k2.5] Handing off to cloud AI")
+            print("[cloud] Handing off to cloud AI (moonshot-v1-8k)")
             query = result.arguments.get("query", text)
             self._handle_cloud_query(query)
 
