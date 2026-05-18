@@ -51,7 +51,7 @@ class KimiClient:
         })
 
         payload = {
-            "model": "kimi-k2.5",
+            "model": "moonshot-v1-8k",
             "messages": messages,
             "stream": False
         }
