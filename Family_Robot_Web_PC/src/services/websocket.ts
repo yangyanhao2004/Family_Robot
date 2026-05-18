@@ -28,6 +28,17 @@ export interface WebSocketMessage {
   role?: string;
 }
 
+export function getUserIdFromToken(): number {
+  try {
+    const token = localStorage.getItem('auth_token')
+    if (!token) return 0
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.userId || payload.sub || 0
+  } catch {
+    return 0
+  }
+}
+
 type MessageListener = (msg: WebSocketMessage) => void;
 
 class WebSocketService {
@@ -69,7 +80,7 @@ class WebSocketService {
         this.reconnectCount = 0;
         this.isRegistered = false;
         store.updateConnectionStatus(true, null);
-        this.sendRaw({ type: 'register', role: 'web' });
+        this.sendRaw({ type: 'register', role: 'web', user_id: getUserIdFromToken() });
         this.startHeartbeat();
       };
 
@@ -129,6 +140,22 @@ class WebSocketService {
     this.sendRaw({
       type: 'command',
       payload: { command, angle },
+    });
+  }
+
+  sendAIChat(userId: number, message: string): void {
+    if (!this.isConnected() || !this.isRegistered) return;
+    this.sendRaw({
+      type: 'ai_chat',
+      payload: { user_id: userId, message },
+    });
+  }
+
+  sendAISessionEnd(userId: number): void {
+    if (!this.isConnected() || !this.isRegistered) return;
+    this.sendRaw({
+      type: 'ai_session_end',
+      payload: { user_id: userId },
     });
   }
 

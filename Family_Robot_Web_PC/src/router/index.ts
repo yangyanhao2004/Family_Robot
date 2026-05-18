@@ -33,9 +33,19 @@ const router = createRouter({
           component: () => import('@/views/DashboardView.vue'),
         },
         {
+          path: 'ai-chat',
+          name: 'aiChat',
+          component: () => import('@/views/AIChatView.vue'),
+        },
+        {
           path: 'album',
           name: 'album',
           component: () => import('@/views/AlbumView.vue'),
+        },
+        {
+          path: 'reminders',
+          name: 'reminders',
+          component: () => import('@/views/ReminderView.vue'),
         },
         {
           path: 'settings',

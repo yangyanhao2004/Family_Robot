@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend.core.connection_manager import manager
 from backend.core.video_stream import video_hub
+from backend.internal.voice_reminder import router as internal_router
 from backend.models.common import BaseMessage, RegisterMessage, ErrorMessage
 
 logger = logging.getLogger('backend')
@@ -127,6 +128,9 @@ async def list_photos():
                     "date": date_str,
                 })
     return items
+
+
+app.include_router(internal_router)
 
 
 @app.get("/")

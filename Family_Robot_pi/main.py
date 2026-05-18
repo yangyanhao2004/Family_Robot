@@ -127,6 +127,13 @@ def _run_all(args: argparse.Namespace):
         else:
             orchestrator.resume_wake_word_detector()
 
+    def on_voice_reminder(text: str):
+        with shared_lock:
+            orchestrator = shared.get("orchestrator")
+        if orchestrator is None:
+            return
+        orchestrator.speak_reminder(text)
+
     def voice_runner():
         try:
             from orchestrator import Orchestrator
@@ -152,6 +159,7 @@ def _run_all(args: argparse.Namespace):
         status_interval=args.status_interval,
         session_control_handler=on_remote_session_change,
         wake_word_control_handler=on_wake_word_control,
+        voice_reminder_handler=on_voice_reminder,
     )
 
     try:

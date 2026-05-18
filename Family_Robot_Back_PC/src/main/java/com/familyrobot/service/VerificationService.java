@@ -6,13 +6,9 @@ import com.familyrobot.model.entity.VerificationCode;
 import com.familyrobot.repository.RobotRepository;
 import com.familyrobot.repository.UserRepository;
 import com.familyrobot.repository.VerificationCodeRepository;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -31,7 +27,7 @@ public class VerificationService {
     private static final String TYPE_LOGIN = "LOGIN";
     private static final String TYPE_RESET_PASSWORD = "RESET_PASSWORD";
 
-    private final JavaMailSender mailSender;
+    private final EmailService emailService;
     private final UserRepository userRepository;
     private final RobotRepository robotRepository;
     private final VerificationCodeRepository codeRepository;
@@ -88,7 +84,7 @@ public class VerificationService {
         saveCode(email, TYPE_REGISTER, code,
                 passwordEncoder.encode(password) + "|" + serialNumber);
 
-        sendEmail(email, "Family Robot - Email Verification Code", "Your verification code is:", code);
+        emailService.sendVerificationEmail(email, "Family Robot - Email Verification Code", "Your verification code is:", code);
         log.info("Verification code sent to {}", email);
     }
 
@@ -123,7 +119,7 @@ public class VerificationService {
         String code = newCode();
         saveCode(email, TYPE_LOGIN, code, null);
 
-        sendEmail(email, "Family Robot - Login Verification Code", "Your login verification code is:", code);
+        emailService.sendVerificationEmail(email, "Family Robot - Login Verification Code", "Your login verification code is:", code);
         log.info("Login code sent to {}", email);
     }
 
@@ -141,7 +137,7 @@ public class VerificationService {
         String code = newCode();
         saveCode(email, TYPE_RESET_PASSWORD, code, null);
 
-        sendEmail(email, "Family Robot - Reset Password", "Your password reset code is:", code);
+        emailService.sendVerificationEmail(email, "Family Robot - Reset Password", "Your password reset code is:", code);
         log.info("Reset password code sent to {}", email);
     }
 
@@ -152,31 +148,6 @@ public class VerificationService {
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         log.info("Password reset for {}", email);
-    }
-
-    // ---- Shared ----
-
-    private void sendEmail(String to, String subject, String label, String code) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom("yangyanhao2004@qq.com");
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(String.format("""
-                    <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto;">
-                        <h2 style="color: #2563eb;">Family Robot</h2>
-                        <p>%s</p>
-                        <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; text-align: center; margin: 16px 0;">
-                            <span style="font-size: 28px; font-weight: bold; letter-spacing: 8px; color: #1f2937;">%s</span>
-                        </div>
-                        <p style="color: #6b7280; font-size: 13px;">This code expires in 5 minutes. If you did not request this, please ignore this email.</p>
-                    </div>
-                    """, label, code), true);
-            mailSender.send(message);
-        } catch (MessagingException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to send email: " + e.getMessage());
-        }
     }
 
     @Scheduled(fixedRate = 300_000)

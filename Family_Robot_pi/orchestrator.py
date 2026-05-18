@@ -28,6 +28,7 @@ from brain.tools.news_tool import NewsTool
 from brain.tools.system_tool import get_system_status
 from brain.tools.joke_tool import get_joke
 from brain.cloud_client import KimiClient
+from brain.session_manager import session_manager
 from senses.wake_word_detector import WakeWordDetector
 
 # Pre-generated filler WAVs in assets/fillers/
@@ -38,6 +39,8 @@ FILLER_WAVS = {
     "Let me check.": "assets/fillers/filler_3.wav",
     "Working on it.": "assets/fillers/filler_4.wav",
 }
+
+PI_USER_ID = 0
 
 T = TypeVar("T")
 
@@ -147,6 +150,9 @@ class Orchestrator:
                     print(f"    Warning: Filler WAV missing: {rel_path}")
             if self._filler_wavs:
                 print(f"  - Loaded {len(self._filler_wavs)} filler phrases")
+
+        # Create persistent Pi chat session for multi-turn conversations
+        session_manager.get_or_create(PI_USER_ID)
 
         print("Initialization complete!")
 
@@ -289,6 +295,18 @@ class Orchestrator:
         with self._state_lock:
             self._wake_word_started = False
         self.wake_word.stop()
+        session_manager.destroy(PI_USER_ID)
+
+    def speak_reminder(self, text: str):
+        """Speak a voice reminder via TTS, bypassing remote session check."""
+        if not text:
+            return
+        print(f"Reminder TTS: {text}")
+        try:
+            audio_path = self.tts.synthesize(text)
+            self.audio.play_wav(audio_path)
+        except Exception as e:
+            print(f"Reminder TTS error: {e}")
 
     def _timed(self, label: str, func: Callable[[], T]) -> T:
         """Run a callable and optionally log its duration."""
@@ -427,14 +445,22 @@ class Orchestrator:
             self._handle_cloud_query(query)
 
     def _handle_cloud_query(self, query: str):
-        """Handle cloud API query."""
+        """Handle cloud API query with multi-turn conversation history."""
         if not self.cloud:
             self._speak("Sorry, cloud AI is not configured.")
             return
 
         try:
-            # Non-streaming for simplicity
-            response = self.cloud.chat(query)
+            session = session_manager.get_or_create(PI_USER_ID)
+            session.add_message("user", query)
+
+            messages = []
+            if self.cloud.soul_prompt:
+                messages.append({"role": "system", "content": self.cloud.soul_prompt})
+            messages.extend(session.get_messages())
+
+            response = self.cloud.chat_messages(messages)
+            session.add_message("assistant", response)
             self._speak(response)
         except Exception as e:
             print(f"Cloud error: {e}")

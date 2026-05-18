@@ -2,12 +2,15 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { useChatStore } from '@/stores/chatStore'
+import webSocketService, { getUserIdFromToken } from '@/services/websocket'
 import { api } from '@/services/api'
 import { LogOut } from 'lucide-vue-next'
 import type { UserProfile } from '@/types'
 
 const router = useRouter()
 const auth = useAuthStore()
+const chatStore = useChatStore()
 
 const profile = ref<UserProfile>({
   name: '',
@@ -31,6 +34,11 @@ onMounted(async () => {
 })
 
 function handleLogout() {
+  const userId = getUserIdFromToken()
+  if (webSocketService.isConnected() && userId) {
+    webSocketService.sendAISessionEnd(userId)
+  }
+  chatStore.clearMessages()
   auth.logout()
   router.push({ name: 'login' })
 }

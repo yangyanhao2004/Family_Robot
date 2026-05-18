@@ -1,18 +1,20 @@
 import asyncio
 import logging
 import os
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from backend.core.connection_manager import manager
 from backend.core.message_router import router
+from backend.front.ai_chat import handle_ai_chat, handle_ai_session_end, cleanup_session_for_disconnect
 from backend.front.handlers import handle_command_message, handle_webrtc_signaling_message
 from backend.models.common import ErrorMessage, RegisterMessage
 
 logger = logging.getLogger("backend.front")
 
 _pending_remote_inactive_task: Optional[asyncio.Task] = None
+_ws_user_map: Dict[int, int] = {}
 
 
 def _session_release_delay_seconds() -> float:
@@ -41,7 +43,9 @@ async def websocket_front_endpoint(websocket: WebSocket):
                     raise ValueError("Missing message type")
 
                 if message_type == "register":
-                    RegisterMessage(**data)
+                    reg = RegisterMessage(**data)
+                    if reg.user_id is not None:
+                        _ws_user_map[id(websocket)] = reg.user_id
                     await websocket.send_json({"type": "register_success"})
                 elif message_type == "command":
                     should_forward = await handle_command_message(data)
@@ -50,6 +54,12 @@ async def websocket_front_endpoint(websocket: WebSocket):
                 elif message_type == "webrtc_signaling":
                     await handle_webrtc_signaling_message(data)
                     await router.route_message("web", data)
+                elif message_type == "ai_chat":
+                    await handle_ai_chat(data)
+                elif message_type == "ai_session_end":
+                    user_id = data.get("payload", {}).get("user_id")
+                    if user_id is not None:
+                        await handle_ai_session_end(int(user_id))
                 elif message_type == "heartbeat":
                     pass
                 else:
@@ -70,6 +80,7 @@ async def websocket_front_endpoint(websocket: WebSocket):
         logger.info("Frontend disconnected: %s:%s", client_ip, client_port)
         should_release = manager.web_connection is websocket
         manager.disconnect(websocket)
+        await cleanup_session_for_disconnect(id(websocket), _ws_user_map)
         if should_release:
             await _schedule_remote_inactive_notification()
     except Exception as exc:
@@ -83,6 +94,7 @@ async def websocket_front_endpoint(websocket: WebSocket):
         finally:
             should_release = manager.web_connection is websocket
             manager.disconnect(websocket)
+            await cleanup_session_for_disconnect(id(websocket), _ws_user_map)
             if should_release:
                 await _schedule_remote_inactive_notification()
 

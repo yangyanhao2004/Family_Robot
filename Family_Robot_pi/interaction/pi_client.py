@@ -76,6 +76,7 @@ class PiWebSocketClient:
         camera_streamer: Optional[CameraStreamer] = None,
         session_control_handler: Optional[Callable[[bool], None]] = None,
         wake_word_control_handler: Optional[Callable[[bool], None]] = None,
+        voice_reminder_handler: Optional[Callable[[str], None]] = None,
         force_local_on_backend_disconnect: bool = True,
         ws_open_timeout: float = 8.0,
     ):
@@ -108,6 +109,7 @@ class PiWebSocketClient:
         self._remote_session_active = False
         self._session_control_handler = session_control_handler
         self._wake_word_control_handler = wake_word_control_handler
+        self._voice_reminder_handler = voice_reminder_handler
         self.force_local_on_backend_disconnect = force_local_on_backend_disconnect
         self.ws_open_timeout = max(2.0, float(ws_open_timeout))
 
@@ -190,6 +192,12 @@ class PiWebSocketClient:
                 signaling_data=signaling_data,
                 send_json=lambda payload: self._send_json(websocket, payload),
             )
+        elif message_type == "voice_reminder":
+            payload = data.get("payload") or {}
+            text = payload.get("text", "")
+            logger.info("Voice reminder received: %s", text)
+            if self._voice_reminder_handler and text:
+                self._voice_reminder_handler(text)
         elif message_type == "error":
             logger.error("Backend error: %s", data.get("message", "Unknown error"))
         else:

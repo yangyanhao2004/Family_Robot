@@ -20,6 +20,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (!res.ok) {
     // 401 on protected endpoints → token expired, force re-login
     if (res.status === 401 && !path.startsWith('/api/auth/')) {
+      // Send session end before clearing token
+      try {
+        const { default: ws, getUserIdFromToken } = await import('@/services/websocket')
+        const uid = getUserIdFromToken()
+        if (ws.isConnected() && uid) {
+          ws.sendAISessionEnd(uid)
+        }
+      } catch { /* ignore */ }
       localStorage.removeItem('auth_token')
       localStorage.removeItem('auth_role')
       window.location.hash = '#/login'
@@ -104,6 +112,19 @@ export const api = {
   // ---- User Profile ----
   getProfile: () =>
     request<{ name: string; email: string; role: string; lastLogin: string }>('/api/users/profile'),
+
+  // ---- Reminders ----
+  getReminders: (userId: number) =>
+    request<import('@/types').ReminderDto[]>(`/api/reminders?userId=${userId}`),
+
+  updateReminder: (id: number, data: Record<string, any>) =>
+    request<void>(`/api/reminders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteReminder: (id: number) =>
+    request<void>(`/api/reminders/${id}`, { method: 'DELETE' }),
 
   // ---- Admin ----
   getAdminUsers: () =>

@@ -36,7 +36,7 @@ class KimiClient:
             self.soul_prompt = Path(soul_path).read_text()
 
     def chat(self, query: str) -> str:
-        """Send query to Kimi K2 and return the response."""
+        """Send single-turn query to Kimi and return the response."""
         messages = []
 
         if self.soul_prompt:
@@ -50,6 +50,10 @@ class KimiClient:
             "content": query
         })
 
+        return self.chat_messages(messages)
+
+    def chat_messages(self, messages: list) -> str:
+        """Send multi-turn messages to Kimi and return the response."""
         payload = {
             "model": "moonshot-v1-8k",
             "messages": messages,
