@@ -4,14 +4,10 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 interface Props {
   streamUrl: string
   streamType?: 'mjpeg' | 'http'
-  autoplay?: boolean
-  muted?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   streamType: 'mjpeg',
-  autoplay: true,
-  muted: true,
 })
 
 const imgRef = ref<HTMLImageElement | null>(null)

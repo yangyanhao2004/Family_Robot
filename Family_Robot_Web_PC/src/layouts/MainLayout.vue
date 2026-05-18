@@ -76,8 +76,6 @@ onUnmounted(() => {
           v-if="store.connectionStatus === 'connected'"
           :stream-url="videoStreamUrl"
           stream-type="mjpeg"
-          autoplay
-          muted
           class="absolute inset-0 w-full h-full"
         />
         <div v-else class="flex flex-col items-center justify-center text-neutral-500 gap-4">

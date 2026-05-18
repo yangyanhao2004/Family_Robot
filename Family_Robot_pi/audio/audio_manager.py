@@ -215,14 +215,6 @@ class AudioManager:
         normalized = self._normalize(raw_audio)
         return normalized[::3]
 
-    def save_to_wav(self, audio: np.ndarray, filepath: str):
-        """Save audio array to a WAV file."""
-        with wave.open(filepath, "wb") as wf:
-            wf.setnchannels(self.channels)
-            wf.setsampwidth(2)
-            wf.setframerate(self.sample_rate)
-            wf.writeframes(audio.tobytes())
-
     def play_wav(self, filepath: str):
         """Play a WAV file through the configured speaker."""
         self.mute()
@@ -244,14 +236,5 @@ class AudioManager:
                 sd.wait()
         except Exception as e:
             print("Playback error: {}".format(e))
-        finally:
-            self.unmute()
-
-    def play_audio(self, audio: np.ndarray):
-        """Play an in-memory audio array."""
-        self.mute()
-        try:
-            sd.play(audio, self.sample_rate)
-            sd.wait()
         finally:
             self.unmute()

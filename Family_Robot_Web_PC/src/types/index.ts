@@ -1,18 +1,5 @@
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected'
 
-export interface RobotStatus {
-  battery: number
-  isRunning: boolean
-  signalStrength: number
-}
-
-export type RobotCommand =
-  | 'forward'
-  | 'backward'
-  | 'left'
-  | 'right'
-  | 'stop'
-
 export interface Notification {
   id: string
   message: string
@@ -34,7 +21,6 @@ export interface AlbumPhoto {
 }
 
 export interface RobotSettings {
-  autoSave: boolean
   firmwareVersion: string
   serialNumber: string
 }

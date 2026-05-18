@@ -33,12 +33,5 @@ public class User {
     @Builder.Default
     private String role = "User";
 
-    @Column(length = 500)
-    private String avatarUrl;
-
     private LocalDateTime lastLogin;
-
-    @Column(nullable = false)
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
 }

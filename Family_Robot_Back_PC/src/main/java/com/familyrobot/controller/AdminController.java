@@ -9,6 +9,7 @@ import com.familyrobot.repository.UserRepository;
 import com.familyrobot.security.AesPasswordEncoder;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +22,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
+@Slf4j
 public class AdminController {
 
     private final UserRepository userRepository;
@@ -46,7 +48,6 @@ public class AdminController {
                         .email(u.getEmail())
                         .name(u.getName())
                         .role(u.getRole())
-                        .password(aesPasswordEncoder.decrypt(u.getPassword()))
                         .robotSerialNumbers(robots.stream()
                                 .filter(r -> r.getUser() != null && r.getUser().getId().equals(u.getId()))
                                 .map(Robot::getSerialNumber)
@@ -55,6 +56,22 @@ public class AdminController {
                 .toList();
 
         return ResponseEntity.ok(dtos);
+    }
+
+    @GetMapping("/users/{userId}/password")
+    public ResponseEntity<Map<String, String>> getUserPassword(
+            @AuthenticationPrincipal User admin,
+            @PathVariable Long userId) {
+        requireAdmin(admin);
+
+        User targetUser = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        String plaintext = aesPasswordEncoder.decrypt(targetUser.getPassword());
+        log.warn("Admin {} (id={}) viewed plaintext password of user {} (id={})",
+                admin.getEmail(), admin.getId(), targetUser.getEmail(), userId);
+
+        return ResponseEntity.ok(Map.of("password", plaintext));
     }
 
     @PostMapping("/robots")

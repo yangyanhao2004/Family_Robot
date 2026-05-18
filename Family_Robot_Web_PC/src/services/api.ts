@@ -60,9 +60,6 @@ export const api = {
       body: JSON.stringify({ email, code }),
     }),
 
-  logout: () =>
-    request<void>('/api/auth/logout', { method: 'POST' }),
-
   sendLoginCode: (email: string) =>
     request<{ message: string }>('/api/auth/login-code/send', {
       method: 'POST',
@@ -102,13 +99,7 @@ export const api = {
 
   // ---- Settings ----
   getSettings: () =>
-    request<{ autoSave: boolean; firmwareVersion: string; serialNumber: string }>('/api/settings'),
-
-  updateSettings: (settings: Record<string, unknown>) =>
-    request<void>('/api/settings', {
-      method: 'PUT',
-      body: JSON.stringify(settings),
-    }),
+    request<{ firmwareVersion: string; serialNumber: string }>('/api/settings'),
 
   // ---- User Profile ----
   getProfile: () =>
@@ -116,7 +107,10 @@ export const api = {
 
   // ---- Admin ----
   getAdminUsers: () =>
-    request<{ userId: number; email: string; name: string; role: string; password: string; robotSerialNumbers: string[] }[]>('/api/admin/users'),
+    request<{ userId: number; email: string; name: string; role: string; robotSerialNumbers: string[] }[]>('/api/admin/users'),
+
+  getUserPassword: (userId: number) =>
+    request<{ password: string }>(`/api/admin/users/${userId}/password`),
 
   registerRobot: (serialNumber: string) =>
     request<{ message: string }>('/api/admin/robots', {

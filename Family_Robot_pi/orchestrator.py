@@ -434,7 +434,7 @@ class Orchestrator:
 
         try:
             # Non-streaming for simplicity
-            response = self.cloud.chat(query, stream=False)
+            response = self.cloud.chat(query)
             self._speak(response)
         except Exception as e:
             print(f"Cloud error: {e}")

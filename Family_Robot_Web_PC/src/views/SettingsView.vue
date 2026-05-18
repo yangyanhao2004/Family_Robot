@@ -4,7 +4,6 @@ import { api } from '@/services/api'
 import type { RobotSettings } from '@/types'
 
 const settings = ref<RobotSettings>({
-  autoSave: true,
   firmwareVersion: '',
   serialNumber: '',
 })

@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { api } from '@/services/api'
+import { Eye, EyeOff } from 'lucide-vue-next'
 
 interface AdminUser {
   userId: number
   email: string
   name: string
   role: string
-  password: string
   robotSerialNumbers: string[]
 }
 
 const users = ref<AdminUser[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const revealedPasswords = reactive<Record<number, string>>({})
+const loadingPassword = ref<Record<number, boolean>>({})
 
 onMounted(async () => {
   try {
@@ -24,6 +26,22 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+async function revealPassword(userId: number) {
+  if (revealedPasswords[userId]) {
+    delete revealedPasswords[userId]
+    return
+  }
+  loadingPassword.value[userId] = true
+  try {
+    const res = await api.getUserPassword(userId)
+    revealedPasswords[userId] = res.password
+  } catch (e) {
+    // ignore
+  } finally {
+    loadingPassword.value[userId] = false
+  }
+}
 </script>
 
 <template>
@@ -64,8 +82,20 @@ onMounted(async () => {
 
           <!-- Password -->
           <div class="bg-[#0D0D0D] rounded p-3 mb-3">
-            <span class="text-xs text-neutral-500 font-medium uppercase tracking-wider">Password</span>
-            <p class="text-sm text-neutral-300 font-mono mt-1">{{ user.password }}</p>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-neutral-500 font-medium uppercase tracking-wider">Password</span>
+              <button
+                @click="revealPassword(user.userId)"
+                :disabled="loadingPassword[user.userId]"
+                class="flex items-center gap-1 text-xs text-neutral-400 hover:text-amber-400 transition-colors disabled:opacity-50"
+              >
+                <Eye v-if="!revealedPasswords[user.userId]" class="w-3.5 h-3.5" />
+                <EyeOff v-else class="w-3.5 h-3.5" />
+                {{ loadingPassword[user.userId] ? 'Loading...' : revealedPasswords[user.userId] ? 'Hide' : 'View' }}
+              </button>
+            </div>
+            <p v-if="revealedPasswords[user.userId]" class="text-sm text-amber-400 font-mono mt-1">{{ revealedPasswords[user.userId] }}</p>
+            <p v-else class="text-sm text-neutral-600 font-mono mt-1">••••••••</p>
           </div>
 
           <!-- Robots -->

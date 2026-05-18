@@ -267,16 +267,6 @@ void Motor_SetSpeed(uint8_t motor_id, int16_t speed)
   }
 }
 
-/* ===== 编码器读取 ===== */
-int32_t Encoder_GetCount(uint8_t encoder_id)
-{
-  if (encoder_id == 0)  /* 丝印M1 → TIM5(PA0/PA1) */
-    return (int32_t)__HAL_TIM_GET_COUNTER(&htim5);
-  else if (encoder_id == 1)  /* 丝印M2 → TIM2(PA15/PB3) */
-    return (int32_t)__HAL_TIM_GET_COUNTER(&htim2);
-  return 0;
-}
-
 /* ===== TIM13 软件PWM中断回调 (10μs周期, Update溢出中断) ===== */
 void HAL_TIM_PeriodElapsedCallback_TIM13(TIM_HandleTypeDef *htim)
 {

@@ -13,10 +13,8 @@ export type RobotCommand =
   | 'speed_medium'
   | 'speed_high';
 
-export type WebRTCSignalType = 'offer' | 'answer' | 'candidate';
-
 export interface WebRTCSignalPayload {
-  type: WebRTCSignalType;
+  type: 'offer' | 'answer' | 'candidate';
   offer?: RTCSessionDescriptionInit;
   answer?: RTCSessionDescriptionInit;
   candidate?: RTCIceCandidateInit;

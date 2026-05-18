@@ -68,18 +68,6 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 
-/* ===== 电机 PWM 引脚 (TIM1 CH1~CH4 → PE9/PE11/PE13/PE14) ===== */
-/* 丝印M1(电机1): CH3正转/CH4反转 → PE13/PE14, 编码器TIM5(PA0/PA1)  */
-/* 丝印M2(电机2): CH1正转/CH2反转 → PE9/PE11,  编码器TIM2(PA15/PB3) */
-#define MOTOR1_PWM_POS_Pin      GPIO_PIN_13   /* TIM1_CH3  丝印M1正转 */
-#define MOTOR1_PWM_POS_Port     GPIOE
-#define MOTOR1_PWM_NEG_Pin      GPIO_PIN_14   /* TIM1_CH4  丝印M1反转 */
-#define MOTOR1_PWM_NEG_Port     GPIOE
-#define MOTOR2_PWM_POS_Pin      GPIO_PIN_9    /* TIM1_CH1  丝印M2正转 */
-#define MOTOR2_PWM_POS_Port     GPIOE
-#define MOTOR2_PWM_NEG_Pin      GPIO_PIN_11   /* TIM1_CH2  丝印M2反转 */
-#define MOTOR2_PWM_NEG_Port     GPIOE
-
 /* ===== 舵机软件PWM参数 ===== */
 #define SERVO_PULSE_MIN         50    /* 0.5ms  → 0°   (50 * 10μs) */
 #define SERVO_PULSE_MAX         250   /* 2.5ms  → 180° (250 * 10μs) */
@@ -91,7 +79,6 @@ void Error_Handler(void);
 /* ===== 函数声明 ===== */
 void Servo_SetAngle(uint8_t servo_id, float angle);
 void Motor_SetSpeed(uint8_t motor_id, int16_t speed);
-int32_t Encoder_GetCount(uint8_t encoder_id);
 
 /* ===== 串口指令速查 ===== */
 /* ── 舵机 ── */

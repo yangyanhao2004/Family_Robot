@@ -13,7 +13,6 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -30,12 +29,6 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
-    }
-
-    @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout(@AuthenticationPrincipal User user) {
-        authService.logout(user.getId());
-        return ResponseEntity.ok(Map.of("message", "ok"));
     }
 
     @PostMapping("/register")

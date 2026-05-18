@@ -72,27 +72,6 @@ class WebRTCService {
     this.stateListener = listener;
   }
 
-  getRemoteStream(): MediaStream | null {
-    return this.remoteStream;
-  }
-
-  getMicStatus(): boolean {
-    return this.isMicEnabled;
-  }
-
-  getConnectionState(): string {
-    return this.peerConnection?.connectionState || 'disconnected';
-  }
-
-  toggleMicrophone(): boolean {
-    if (!this.localStream) return this.isMicEnabled;
-    this.isMicEnabled = !this.isMicEnabled;
-    this.localStream.getAudioTracks().forEach((track) => {
-      track.enabled = this.isMicEnabled;
-    });
-    return this.isMicEnabled;
-  }
-
   private async ensurePeerConnection(): Promise<void> {
     if (!this.isSignalingBound) {
       webSocketService.addMessageListener(this.signalingListener);

@@ -45,12 +45,6 @@ class ConnectionManager:
                 logger.error(f"Send to Pi failed: {e}")
                 self.disconnect(self.pi_connection)
 
-    async def broadcast(self, message: dict):
-        if self.web_connection:
-            await self.send_to_web(message)
-        if self.pi_connection:
-            await self.send_to_pi(message)
-
     def is_web_connected(self) -> bool:
         return self.web_connection is not None
 

@@ -79,12 +79,6 @@ router.beforeEach(async (to, _from, next) => {
     next({ name: 'login' })
   } else if (to.meta.requiresAdmin && role !== 'Admin') {
     next({ name: 'dashboard' })
-  } else if (to.name === 'login' && token) {
-    if (role === 'Admin') {
-      next({ name: 'adminUsers' })
-    } else {
-      next({ name: 'dashboard' })
-    }
   } else if (to.meta.requiresAuth && token && !tokenVerified) {
     // Verify token on first protected navigation
     try {

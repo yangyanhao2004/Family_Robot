@@ -32,7 +32,10 @@ function toggleSelect(id: string) {
   else selected.value.push(id)
 }
 
-function deleteSelected() {
+async function deleteSelected() {
+  for (const id of selected.value) {
+    await api.deletePhoto(id)
+  }
   photos.value = photos.value.filter((p) => !selected.value.includes(p.id))
   selected.value = []
 }

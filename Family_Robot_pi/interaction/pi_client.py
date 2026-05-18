@@ -334,32 +334,3 @@ class PiWebSocketClient:
 
             logger.info("Retrying in %.1f seconds...", self.reconnect_interval)
             await asyncio.sleep(self.reconnect_interval)
-
-
-async def _async_main():
-    client = PiWebSocketClient(
-        reconnect_interval=_env_float("FAMILY_ROBOT_RECONNECT_INTERVAL", 3.0),
-        status_interval=_env_float("FAMILY_ROBOT_STATUS_INTERVAL", 2.0),
-        camera_enabled=_env_bool("FAMILY_ROBOT_CAMERA_ENABLED", True),
-        camera_width=_env_int("FAMILY_ROBOT_CAMERA_WIDTH", 640),
-        camera_height=_env_int("FAMILY_ROBOT_CAMERA_HEIGHT", 360),
-        camera_fps=_env_int("FAMILY_ROBOT_CAMERA_FPS", 10),
-        camera_jpeg_quality=_env_int("FAMILY_ROBOT_CAMERA_JPEG_QUALITY", 70),
-        force_local_on_backend_disconnect=_env_bool(
-            "FAMILY_ROBOT_FORCE_LOCAL_ON_BACKEND_DISCONNECT", True
-        ),
-        ws_open_timeout=_env_float("FAMILY_ROBOT_WS_OPEN_TIMEOUT", 8.0),
-    )
-    await client.run_forever()
-
-
-def main():
-    logger.info("Pi remote client startup")
-    try:
-        asyncio.run(_async_main())
-    except KeyboardInterrupt:
-        logger.info("Pi remote client stopped by user")
-
-
-if __name__ == "__main__":
-    main()

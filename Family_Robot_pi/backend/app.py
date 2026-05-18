@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from backend.core.connection_manager import manager
-from backend.core.rtc_service import rtc_service
 from backend.core.video_stream import video_hub
 from backend.models.common import BaseMessage, RegisterMessage, ErrorMessage
 
@@ -135,38 +134,4 @@ async def root():
     return {"message": "Family Robot backend running"}
 
 
-@app.websocket("/ws/rtc")
-async def websocket_rtc_endpoint(websocket: WebSocket):
-    try:
-        data = await websocket.receive_json()
-        if data.get('type') == 'register':
-            client_id = data.get('client_id')
-            if not client_id:
-                await websocket.close(code=1008, reason="Missing client_id")
-                return
 
-            await rtc_service.connect(websocket, client_id)
-            await websocket.send_json({"type": "register_success", "client_id": client_id})
-
-            while True:
-                try:
-                    data = await websocket.receive_json()
-                    await rtc_service.handle_signaling(client_id, data)
-                except WebSocketDisconnect:
-                    rtc_service.disconnect(client_id)
-                    break
-                except Exception as e:
-                    logger.error(f"RTC message error: {e}")
-                    try:
-                        await websocket.send_json({
-                            "type": "error", "message": f"Message handling failed: {e}"
-                        })
-                    except Exception:
-                        rtc_service.disconnect(client_id)
-                        break
-        else:
-            await websocket.close(code=1008, reason="Missing register message")
-    except WebSocketDisconnect:
-        pass
-    except Exception as e:
-        logger.error(f"RTC connection error: {e}")

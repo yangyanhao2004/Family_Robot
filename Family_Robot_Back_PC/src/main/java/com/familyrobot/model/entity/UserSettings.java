@@ -22,9 +22,6 @@ public class UserSettings {
     @JoinColumn(name = "user_id", unique = true)
     private User user;
 
-    @Builder.Default
-    private Boolean autoSave = true;
-
     @Column(length = 50)
     @Builder.Default
     private String firmwareVersion = "v2.4.1 (latest)";

@@ -20,9 +20,4 @@ public class SettingsController {
         return ResponseEntity.ok(settingsService.getSettings(user.getId()));
     }
 
-    @PutMapping
-    public ResponseEntity<SettingsDto> updateSettings(@AuthenticationPrincipal User user,
-                                                       @RequestBody SettingsDto dto) {
-        return ResponseEntity.ok(settingsService.updateSettings(user.getId(), dto));
-    }
 }

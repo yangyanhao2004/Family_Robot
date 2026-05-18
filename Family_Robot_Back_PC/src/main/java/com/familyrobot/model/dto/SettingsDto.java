@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class SettingsDto {
-    private Boolean autoSave;
     private String firmwareVersion;
     private String serialNumber;
 }

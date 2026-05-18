@@ -20,12 +20,7 @@ async function handleSendCode() {
   isSendingCode.value = true
   errorMsg.value = ''
   try {
-    if (loginMethod.value === 'code') {
-      await api.sendLoginCode(email.value)
-    } else {
-      // password mode doesn't send code
-      return
-    }
+    await api.sendLoginCode(email.value)
   } catch (e) {
     errorMsg.value = (e as Error).message
   } finally {

@@ -39,7 +39,4 @@ public class AuthService {
         return new LoginResponse(token, user.getRole());
     }
 
-    public void logout(Long userId) {
-        log.info("User logged out: {}", userId);
-    }
 }

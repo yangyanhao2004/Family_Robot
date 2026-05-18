@@ -7,7 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "photos")
@@ -27,15 +26,9 @@ public class Photo {
     @Column(length = 255)
     private String filename;
 
-    private Long size;
-
     @Column(nullable = false)
     @Builder.Default
     private LocalDate date = LocalDate.now();
-
-    @Column(nullable = false)
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
