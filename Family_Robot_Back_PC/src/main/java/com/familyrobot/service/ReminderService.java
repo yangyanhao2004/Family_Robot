@@ -124,7 +124,8 @@ public class ReminderService {
     }
 
     private void sendVoiceReminder(Reminder r) {
-        try (HttpClient client = HttpClient.newHttpClient()) {
+        HttpClient client = HttpClient.newHttpClient();
+        try {
             String body = String.format("{\"reminderId\":%d,\"text\":\"%s\",\"userId\":%d}",
                     r.getId(), r.getText(), r.getUserId());
             HttpRequest request = HttpRequest.newBuilder()
