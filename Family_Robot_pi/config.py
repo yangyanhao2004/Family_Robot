@@ -40,7 +40,7 @@ class Config:
     # Wake word
     wake_word_name: str = "hey_jarvis"
     wake_word_model: str = ""
-    wake_word_threshold: float = 0.45
+    wake_word_threshold: float = 0.5
 
     # Audio device settings
     mic_sample_rate: int = 48000
