@@ -36,6 +36,7 @@ const router = createRouter({
           path: 'ai-chat',
           name: 'aiChat',
           component: () => import('@/views/AIChatView.vue'),
+          meta: { requiresAuth: true, userOnly: true },
         },
         {
           path: 'album',
@@ -46,6 +47,7 @@ const router = createRouter({
           path: 'reminders',
           name: 'reminders',
           component: () => import('@/views/ReminderView.vue'),
+          meta: { requiresAuth: true, userOnly: true },
         },
         {
           path: 'settings',
@@ -88,6 +90,8 @@ router.beforeEach(async (to, _from, next) => {
   if (to.meta.requiresAuth && !token) {
     next({ name: 'login' })
   } else if (to.meta.requiresAdmin && role !== 'Admin') {
+    next({ name: 'login' })
+  } else if (to.meta.userOnly && role === 'Admin') {
     next({ name: 'login' })
   } else if (to.meta.requiresAuth && token && !tokenVerified) {
     // Verify token on first protected navigation
