@@ -1,14 +1,11 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
-import { useChatStore } from '@/stores/chatStore'
-import webSocketService, { getUserIdFromToken } from '@/services/websocket'
-import { LayoutDashboard, Image as ImageIcon, Settings as SettingsIcon, User, MessageCircle, Bell, LogOut } from 'lucide-vue-next'
+import { LayoutDashboard, Image as ImageIcon, Settings as SettingsIcon, User, MessageCircle, Bell } from 'lucide-vue-next'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const chatStore = useChatStore()
 
 const allNavItems = [
   { path: '/home', icon: LayoutDashboard, label: '仪表板', adminOnly: false },
@@ -32,16 +29,6 @@ function isActive(path: string) {
 function navigate(path: string) {
   router.push(path)
 }
-
-function handleSignOut() {
-  const userId = getUserIdFromToken()
-  if (webSocketService.isConnected() && userId) {
-    webSocketService.sendAISessionEnd(userId)
-  }
-  chatStore.clearMessages()
-  authStore.logout()
-  router.push({ name: 'login' })
-}
 </script>
 
 <template>
@@ -59,16 +46,6 @@ function handleSignOut() {
     >
       <component :is="item.icon" class="w-6 h-6" />
       <span class="text-[11px] font-medium">{{ item.label }}</span>
-    </button>
-
-    <!-- Sign Out (non-admin only) -->
-    <button
-      v-if="!authStore.isAdmin"
-      @click="handleSignOut"
-      class="flex flex-col items-center gap-2 p-3 w-full text-neutral-600 hover:text-red-400 transition-colors mt-auto"
-    >
-      <LogOut class="w-5 h-5" />
-      <span class="text-[11px] font-medium">退出</span>
     </button>
   </nav>
 </template>

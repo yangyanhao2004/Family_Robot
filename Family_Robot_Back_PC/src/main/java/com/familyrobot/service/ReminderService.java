@@ -124,12 +124,13 @@ public class ReminderService {
     }
 
     private void sendVoiceReminder(Reminder r) {
+        String pythonBackend = System.getenv().getOrDefault("PYTHON_BACKEND_URL", "http://localhost:8080");
         HttpClient client = HttpClient.newHttpClient();
         try {
             String body = String.format("{\"reminderId\":%d,\"text\":\"%s\",\"userId\":%d}",
                     r.getId(), r.getText(), r.getUserId());
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create("http://localhost:8080/internal/voice-reminder"))
+                    .uri(URI.create(pythonBackend + "/internal/voice-reminder"))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .timeout(Duration.ofSeconds(10))

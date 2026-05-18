@@ -6,6 +6,7 @@ Handles the full lifecycle: receive -> route to Kimi K2.5 -> execute tool -> res
 
 import json
 import logging
+import os
 from typing import Dict, Any, Optional
 
 import httpx
@@ -125,10 +126,11 @@ async def _execute_tool_call(tc, session, user_id: int):
 async def _store_reminder_in_java(
     user_id: int, text: str, scheduled_time: str, method: str, email: str
 ) -> bool:
+    java_url = os.getenv("JAVA_BACKEND_URL", "http://localhost:8090")
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
-                "http://localhost:8090/api/reminders",
+                f"{java_url}/api/reminders",
                 json={
                     "userId": user_id,
                     "text": text,
@@ -151,3 +153,4 @@ async def cleanup_session_for_disconnect(websocket_id: int, user_id_map: Dict[in
     user_id = user_id_map.pop(websocket_id, None)
     if user_id is not None:
         session_manager.destroy(user_id)
+    return user_id

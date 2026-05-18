@@ -80,7 +80,9 @@ async def websocket_front_endpoint(websocket: WebSocket):
         logger.info("Frontend disconnected: %s:%s", client_ip, client_port)
         should_release = manager.web_connection is websocket
         manager.disconnect(websocket)
-        await cleanup_session_for_disconnect(id(websocket), _ws_user_map)
+        cleaned_user = await cleanup_session_for_disconnect(id(websocket), _ws_user_map)
+        if cleaned_user is not None:
+            logger.info("AI session destroyed for user %s on disconnect", cleaned_user)
         if should_release:
             await _schedule_remote_inactive_notification()
     except Exception as exc:
@@ -94,7 +96,9 @@ async def websocket_front_endpoint(websocket: WebSocket):
         finally:
             should_release = manager.web_connection is websocket
             manager.disconnect(websocket)
-            await cleanup_session_for_disconnect(id(websocket), _ws_user_map)
+            cleaned_user = await cleanup_session_for_disconnect(id(websocket), _ws_user_map)
+            if cleaned_user is not None:
+                logger.info("AI session destroyed for user %s on error disconnect", cleaned_user)
             if should_release:
                 await _schedule_remote_inactive_notification()
 
