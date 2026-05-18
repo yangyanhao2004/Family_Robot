@@ -66,6 +66,8 @@ async def websocket_front_endpoint(websocket: WebSocket):
                     logger.warning("Unknown frontend message: %s", message_type)
             except WebSocketDisconnect:
                 raise
+            except asyncio.TimeoutError:
+                continue
             except Exception as exc:
                 logger.error("Frontend message error: %s", exc)
                 try:
@@ -74,8 +76,6 @@ async def websocket_front_endpoint(websocket: WebSocket):
                     )
                 except WebSocketDisconnect:
                     raise
-            except asyncio.TimeoutError:
-                continue
     except WebSocketDisconnect:
         logger.info("Frontend disconnected: %s:%s", client_ip, client_port)
         should_release = manager.web_connection is websocket

@@ -44,6 +44,8 @@ async def websocket_pi_endpoint(websocket: WebSocket):
                     logger.warning("Unknown Pi message: %s", message_type)
             except WebSocketDisconnect:
                 raise
+            except asyncio.TimeoutError:
+                continue
             except Exception as exc:
                 logger.error("Pi message error: %s", exc)
                 try:
@@ -52,8 +54,6 @@ async def websocket_pi_endpoint(websocket: WebSocket):
                     )
                 except WebSocketDisconnect:
                     raise
-            except asyncio.TimeoutError:
-                continue
     except WebSocketDisconnect:
         logger.info("Pi disconnected: %s:%s", client_ip, client_port)
         manager.disconnect(websocket)

@@ -12,7 +12,7 @@ from typing import Dict, Any, Optional
 import httpx
 
 from backend.core.connection_manager import manager
-from brain.web_ai_client import KimiK25Client, WEB_AI_TOOLS, WEB_AI_SYSTEM_PROMPT
+from brain.web_ai_client import KimiK25Client, WEB_AI_TOOLS, get_web_ai_system_prompt
 from brain.session_manager import session_manager
 
 logger = logging.getLogger("backend.front.ai_chat")
@@ -44,7 +44,7 @@ async def handle_ai_chat(message: Dict[str, Any]):
     session = session_manager.get_or_create(int(user_id))
     session.add_message("user", user_text)
 
-    api_messages = [{"role": "system", "content": WEB_AI_SYSTEM_PROMPT}]
+    api_messages = [{"role": "system", "content": get_web_ai_system_prompt()}]
     api_messages.extend(session.get_messages())
 
     try:

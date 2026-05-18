@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -72,7 +75,11 @@ public class ReminderService {
 
         if (req.getText() != null) reminder.setText(req.getText());
         if (req.getScheduledTime() != null) {
-            reminder.setScheduledTime(parseReminderDateTime(req.getScheduledTime()));
+            LocalDateTime newTime = parseReminderDateTime(req.getScheduledTime());
+            reminder.setScheduledTime(newTime);
+            if (newTime.isAfter(LocalDateTime.now())) {
+                reminder.setSent(false);
+            }
         }
         if (req.getMethod() != null) reminder.setMethod(req.getMethod());
         if (req.getEmail() != null) reminder.setEmail(req.getEmail());
@@ -129,15 +136,20 @@ public class ReminderService {
                 r.getScheduledTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
     }
 
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     private void sendVoiceReminder(Reminder r) {
         HttpClient client = HttpClient.newHttpClient();
         try {
-            String body = String.format("{\"reminderId\":%d,\"text\":\"%s\",\"userId\":%d}",
-                    r.getId(), r.getText(), r.getUserId());
+            ObjectNode body = objectMapper.createObjectNode();
+            body.put("reminderId", r.getId());
+            body.put("text", r.getText());
+            body.put("userId", r.getUserId());
+            String json = objectMapper.writeValueAsString(body);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(pythonBackendUrl + "/internal/voice-reminder"))
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
+                    .header("Content-Type", "application/json; charset=utf-8")
+                    .POST(HttpRequest.BodyPublishers.ofString(json))
                     .timeout(Duration.ofSeconds(10))
                     .build();
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
