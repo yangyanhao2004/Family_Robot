@@ -866,9 +866,30 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
       char *sep = strchr(cmd_buf, '=');
       if (!sep) sep = strchr(cmd_buf, ':');
 
-      if (sep)
+      if (sep) *sep = '\0';  /* 分割: cmd_buf=指令名, sep+1=参数 */
+
+      /* ---- 无参命令: RP1/RP2/RST1/RST2 (带不带分隔符都生效) ---- */
+      if (strcmp(cmd_buf, "RP1") == 0)
       {
-        *sep = '\0';  /* 分割: cmd_buf=指令名, sep+1=参数 */
+        PID_Report(1, &pid1);
+      }
+      else if (strcmp(cmd_buf, "RP2") == 0)
+      {
+        PID_Report(2, &pid2);
+      }
+      else if (strcmp(cmd_buf, "RST1") == 0)
+      {
+        PID_Reset(&pid1);
+        uart_printf("PID1 integral reset\r\n");
+      }
+      else if (strcmp(cmd_buf, "RST2") == 0)
+      {
+        PID_Reset(&pid2);
+        uart_printf("PID2 integral reset\r\n");
+      }
+      /* ---- 有参命令: 必须有分隔符 ---- */
+      else if (sep)
+      {
         if (strcmp(cmd_buf, "S1") == 0)
         {
           float angle = atof(sep + 1);
@@ -998,26 +1019,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         {
           pid2.ramp = atof(sep + 1);
           uart_printf("ramp2=%.1f\r\n", (double)pid2.ramp);
-        }
-        /* ---- 读回全部PID参数(RP1/RP2) ---- */
-        else if (strcmp(cmd_buf, "RP1") == 0)
-        {
-          PID_Report(1, &pid1);
-        }
-        else if (strcmp(cmd_buf, "RP2") == 0)
-        {
-          PID_Report(2, &pid2);
-        }
-        /* ---- 复位积分累加器(RST1/RST2) ---- */
-        else if (strcmp(cmd_buf, "RST1") == 0)
-        {
-          PID_Reset(&pid1);
-          uart_printf("PID1 integral reset\r\n");
-        }
-        else if (strcmp(cmd_buf, "RST2") == 0)
-        {
-          PID_Reset(&pid2);
-          uart_printf("PID2 integral reset\r\n");
         }
         else
         {

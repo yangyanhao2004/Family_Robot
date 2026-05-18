@@ -53,7 +53,6 @@ class KimiClient:
         payload = {
             "model": "kimi-k2.5",
             "messages": messages,
-            "temperature": 0.7,
             "stream": False
         }
 
