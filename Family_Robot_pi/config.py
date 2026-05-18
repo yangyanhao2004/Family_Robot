@@ -68,6 +68,9 @@ class Config:
     enable_filler_audio: bool = False
     log_stage_timings: bool = True
 
+    # External service URLs
+    java_backend_url: str = "http://localhost:8090"
+
     @classmethod
     def load(cls, config_path: Optional[str] = None) -> "Config":
         """Load configuration from file and environment."""
@@ -100,6 +103,10 @@ class Config:
         config.newsapi_key = os.getenv(
             "NEWSAPI_KEY",
             config.newsapi_key,
+        )
+        config.java_backend_url = os.getenv(
+            "JAVA_BACKEND_URL",
+            config.java_backend_url,
         )
 
         return config

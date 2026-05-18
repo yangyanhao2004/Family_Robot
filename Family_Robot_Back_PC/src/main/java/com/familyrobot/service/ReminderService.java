@@ -5,8 +5,8 @@ import com.familyrobot.model.dto.ReminderDto;
 import com.familyrobot.model.dto.UpdateReminderRequest;
 import com.familyrobot.model.entity.Reminder;
 import com.familyrobot.repository.ReminderRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -25,11 +25,19 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class ReminderService {
 
     private final ReminderRepository reminderRepository;
     private final EmailService emailService;
+    private final String pythonBackendUrl;
+
+    public ReminderService(ReminderRepository reminderRepository,
+                           EmailService emailService,
+                           @Value("${app.python-backend-url:http://localhost:8080}") String pythonBackendUrl) {
+        this.reminderRepository = reminderRepository;
+        this.emailService = emailService;
+        this.pythonBackendUrl = pythonBackendUrl;
+    }
 
     public ReminderDto createReminder(CreateReminderRequest req) {
         if (!"EMAIL".equals(req.getMethod()) && !"VOICE".equals(req.getMethod())) {
@@ -124,13 +132,12 @@ public class ReminderService {
     }
 
     private void sendVoiceReminder(Reminder r) {
-        String pythonBackend = System.getenv().getOrDefault("PYTHON_BACKEND_URL", "http://localhost:8080");
         HttpClient client = HttpClient.newHttpClient();
         try {
             String body = String.format("{\"reminderId\":%d,\"text\":\"%s\",\"userId\":%d}",
                     r.getId(), r.getText(), r.getUserId());
             HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(pythonBackend + "/internal/voice-reminder"))
+                    .uri(URI.create(pythonBackendUrl + "/internal/voice-reminder"))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .timeout(Duration.ofSeconds(10))

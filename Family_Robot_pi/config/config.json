@@ -25,5 +25,6 @@
   "cloud_soul_path": "config/cloud_soul.md",
   "enable_filler_audio": false,
   "log_stage_timings": true,
-  "local_location": "Kingston, CA"
+  "local_location": "Kingston, CA",
+  "java_backend_url": "http://localhost:8090"
 }
