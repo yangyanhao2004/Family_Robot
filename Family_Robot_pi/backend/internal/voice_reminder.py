@@ -1,5 +1,6 @@
 """Internal endpoint for receiving voice reminders from Java backend."""
 
+import asyncio
 import logging
 import re
 
@@ -40,16 +41,24 @@ async def _translate_to_english(text: str) -> str:
         return text
 
 
+async def _process_voice_reminder(reminder_id: int, text: str, user_id: int):
+    """Translate and forward voice reminder to Pi in background."""
+    try:
+        if _CHINESE_PATTERN.search(text):
+            text = await _translate_to_english(text)
+        await manager.send_to_pi({
+            "type": "voice_reminder",
+            "payload": {"text": text, "reminder_id": reminder_id}
+        })
+    except Exception as e:
+        logger.error("Voice reminder #%d background processing failed: %s", reminder_id, e)
+
+
 @router.post("/voice-reminder")
 async def handle_voice_reminder(req: VoiceReminderRequest):
     logger.info("Voice reminder #%d for user %d: %s", req.reminderId, req.userId, req.text)
 
-    text = req.text
-    if _CHINESE_PATTERN.search(text):
-        text = await _translate_to_english(text)
+    # Return immediately so Java doesn't time out; process in background
+    asyncio.create_task(_process_voice_reminder(req.reminderId, req.text, req.userId))
 
-    await manager.send_to_pi({
-        "type": "voice_reminder",
-        "payload": {"text": text, "reminder_id": req.reminderId}
-    })
-    return {"status": "sent", "reminderId": req.reminderId}
+    return {"status": "accepted", "reminderId": req.reminderId}
