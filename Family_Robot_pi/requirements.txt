@@ -1,13 +1,22 @@
-aiortc
+# ── Backend (FastAPI + WebSocket) ────────────────────────────
 fastapi
-httpx
-numpy
-onnxruntime
-openwakeword
-pillow
-piper-tts
-pydantic
-pyserial
-sounddevice
 uvicorn
 websockets
+httpx
+pydantic
+
+# ── Voice pipeline ───────────────────────────────────────────
+numpy
+sounddevice
+openwakeword
+onnxruntime
+piper-tts
+
+# ── Camera ───────────────────────────────────────────────────
+pillow
+
+# ── STM32 serial bridge ──────────────────────────────────────
+pyserial
+
+# ── WebRTC voice call ────────────────────────────────────────
+aiortc

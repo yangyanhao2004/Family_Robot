@@ -82,7 +82,7 @@ function handleLogout() {
       <!-- Change Password -->
       <button
         class="w-full flex items-center justify-center gap-2 py-3 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 rounded-lg font-medium text-sm transition-colors border border-blue-500/20"
-        @click="$router.push({ name: 'resetPassword' })"
+        @click="router.push({ name: 'resetPassword' })"
       >
         <Lock class="w-4 h-4" />
         Change Password

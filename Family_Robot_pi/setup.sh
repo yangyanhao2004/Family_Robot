@@ -38,7 +38,7 @@ sudo apt install -y \
   alsa-utils
 ok "System packages installed"
 
-VENV_DIR="venv313"
+VENV_DIR="venv"
 if [ ! -d "$VENV_DIR" ]; then
   info "Creating Python virtual environment..."
   python3 -m venv "$VENV_DIR"
