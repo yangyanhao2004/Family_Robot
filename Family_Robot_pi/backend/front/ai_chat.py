@@ -4,6 +4,7 @@ WebSocket handler for ai_chat messages.
 Handles the full lifecycle: receive -> route to Kimi K2.5 -> execute tool -> respond.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -86,6 +87,7 @@ async def _execute_tool_call(tc, session, user_id: int):
     elif name == "control_robot":
         command = args.get("command", "stop")
         angle = args.get("angle", 90)
+        duration = args.get("duration")
         explanation = args.get("explanation", f"Executing {command}")
 
         if command not in VALID_COMMANDS:
@@ -95,6 +97,16 @@ async def _execute_tool_call(tc, session, user_id: int):
             "type": "command",
             "payload": {"command": command, "angle": angle}
         })
+
+        if duration and isinstance(duration, (int, float)) and duration > 0 and command != "stop":
+            async def _auto_stop(delay: float):
+                await asyncio.sleep(delay)
+                await manager.send_to_pi({
+                    "type": "command",
+                    "payload": {"command": "stop"}
+                })
+
+            asyncio.create_task(_auto_stop(float(duration)))
 
         session.add_message("assistant", explanation)
         await manager.send_to_web({

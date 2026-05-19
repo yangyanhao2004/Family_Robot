@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useChatStore } from '@/stores/chatStore'
 import webSocketService, { getUserIdFromToken } from '@/services/websocket'
 import { api } from '@/services/api'
-import { LogOut } from 'lucide-vue-next'
+import { LogOut, Lock } from 'lucide-vue-next'
 import type { UserProfile } from '@/types'
 
 const router = useRouter()
@@ -78,6 +78,15 @@ function handleLogout() {
           <span class="text-sm text-white font-medium">{{ profile.lastLogin }}</span>
         </div>
       </div>
+
+      <!-- Change Password -->
+      <button
+        class="w-full flex items-center justify-center gap-2 py-3 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 rounded-lg font-medium text-sm transition-colors border border-blue-500/20"
+        @click="$router.push({ name: 'resetPassword' })"
+      >
+        <Lock class="w-4 h-4" />
+        Change Password
+      </button>
 
       <!-- Logout -->
       <button

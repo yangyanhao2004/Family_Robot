@@ -33,18 +33,22 @@ WEB_AI_TOOLS = [
         "type": "function",
         "function": {
             "name": "control_robot",
-            "description": "Control the physical robot. Use this when the user asks the robot to move (forward, backward, left, right, stop) or adjust its servo/camera angles (servo1 for horizontal pan, servo2 for vertical tilt).",
+            "description": "Control the physical robot. Use this when the user asks the robot to move (forward, backward, left, right, stop) or adjust its servo/camera angles (servo1 for horizontal pan, servo2 for vertical tilt). ALWAYS use this tool for stop/halt commands — never use chat_reply for stopping the robot.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "command": {
                         "type": "string",
                         "enum": ["forward", "backward", "left", "right", "stop", "servo1", "servo2"],
-                        "description": "The robot command: forward/backward/left/right for movement, stop to halt, servo1 for horizontal pan (0-180 degrees), servo2 for vertical tilt (0-180 degrees)."
+                        "description": "The robot command: forward/backward/left/right for movement, stop to halt, servo1 for horizontal pan (0-180 degrees), servo2 for vertical tilt (0-180 degrees). IMPORTANT: when the user says stop/halt/停/停下, you MUST use command='stop' with this tool."
                     },
                     "angle": {
                         "type": "number",
                         "description": "Angle for servo commands (0-180). Default 90 is centered."
+                    },
+                    "duration": {
+                        "type": "number",
+                        "description": "Duration in seconds for movement commands (forward/backward/left/right only). After this duration, the robot will automatically stop. Omit for indefinite movement. Always use this when the user specifies a time like 'forward for 2 seconds' or '前进2秒'."
                     },
                     "explanation": {
                         "type": "string",
@@ -105,9 +109,11 @@ calculate the absolute ISO 8601 datetime yourself using this current time.
 
 IMPORTANT RULES:
 - Always use the tools provided. Do NOT respond with plain text when a tool is appropriate.
-- When asked to move the robot, use control_robot with the correct command and a friendly explanation.
+- When the user says "stop", "halt", "停下", "停", or any variation of stopping the robot, you MUST use control_robot with command="stop". Never use chat_reply for this — the robot will NOT actually stop unless you call control_robot.
+- When asked to move the robot for a specific duration (e.g. "forward for 2 seconds", "前进2秒"), use control_robot with the duration parameter set to that number of seconds. The robot will stop automatically after that time.
+- When asked to move the robot without a duration (e.g. "go forward"), do NOT include the duration parameter — the robot will keep moving until told to stop.
 - When asked to set a reminder, extract: what to remind about, when (as ISO 8601 in Asia/Shanghai timezone), method (EMAIL or VOICE), and the user's email if needed. Always calculate the absolute time yourself — NEVER ask the user what time it is now.
-- For servo commands: servo1 = horizontal pan (0=far left, 180=far right, 90=center). servo2 = vertical tilt (0=tilt all the way UP, 180=tilt all the way DOWN, 90=center/level). So "tilt up 30 degrees" means angle=60, "tilt down 20 degrees" means angle=110.
+- For servo commands: servo1 = horizontal pan (0=far right, 180=far left, 90=center). servo2 = vertical tilt (0=tilt all the way UP, 180=tilt all the way DOWN, 90=center/level). So "look left" means servo1 angle > 90, "look right" means servo1 angle < 90. "tilt up 30 degrees" means servo2 angle=60, "tilt down 20 degrees" means servo2 angle=110.
 - Keep responses concise and friendly. Use the same language as the user.
 - If the user says something ambiguous, ask clarifying questions via chat_reply.
 - Use only ONE tool per response. Do not combine multiple tools in one call."""

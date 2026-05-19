@@ -117,6 +117,12 @@ export const api = {
   getReminders: (userId: number) =>
     request<import('@/types').ReminderDto[]>(`/api/reminders?userId=${userId}`),
 
+  createReminder: (data: Record<string, any>) =>
+    request<import('@/types').ReminderDto>('/api/reminders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
   updateReminder: (id: number, data: Record<string, any>) =>
     request<void>(`/api/reminders/${id}`, {
       method: 'PUT',

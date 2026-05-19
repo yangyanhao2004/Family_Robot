@@ -48,8 +48,11 @@ function selectAll() {
   }
 }
 
+const _blobUrls: string[] = []
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
+  _blobUrls.push(url)
   const a = document.createElement('a')
   a.href = url
   a.download = filename
@@ -58,8 +61,14 @@ function downloadBlob(blob: Blob, filename: string) {
   a.click()
   setTimeout(() => {
     document.body.removeChild(a)
+  }, 1000)
+}
+
+function cleanupBlobUrls() {
+  for (const url of _blobUrls) {
     URL.revokeObjectURL(url)
-  }, 100)
+  }
+  _blobUrls.length = 0
 }
 
 function canvasBlob(img: HTMLImageElement): Promise<Blob | null> {
@@ -125,10 +134,11 @@ async function downloadSelected() {
       if (!photo) continue
       const ok = await downloadFile(fullUrl(photo.url), photo.url.split('/').pop() || `${id}.jpg`)
       if (!ok) failed++
-      await new Promise((r) => setTimeout(r, 300))
+      await new Promise((r) => setTimeout(r, 800))
     }
   } finally {
     downloading.value = false
+    cleanupBlobUrls()
     if (failed > 0) {
       alert(`Download complete: ${selected.length - failed} succeeded, ${failed} failed.`)
     }
