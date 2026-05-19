@@ -8,6 +8,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from typing import Dict, Any, Optional
 
 import httpx
@@ -19,6 +20,7 @@ from brain.session_manager import session_manager
 logger = logging.getLogger("backend.front.ai_chat")
 
 _kimi_client: Optional[KimiK25Client] = None
+_chinese_pattern = re.compile(r'[一-鿿]')
 
 VALID_COMMANDS = {"forward", "backward", "left", "right", "stop", "servo1", "servo2"}
 
@@ -138,6 +140,22 @@ async def _execute_tool_call(tc, session, user_id: int):
 async def _store_reminder_in_java(
     user_id: int, text: str, scheduled_time: str, method: str, email: str
 ) -> bool:
+    # Pre-translate Chinese VOICE reminders so no delay at trigger time
+    stored_text = text
+    if method == "VOICE" and _chinese_pattern.search(text):
+        try:
+            kimi = _get_kimi()
+            msgs = [
+                {"role": "system", "content": "You are a translator. Translate the following Chinese text to English. Output ONLY the English translation, nothing else. Keep it concise and natural."},
+                {"role": "user", "content": text},
+            ]
+            resp = await kimi.chat(msgs)
+            if resp.content:
+                stored_text = resp.content.strip()
+                logger.info("Pre-translated VOICE reminder: '%s' -> '%s'", text, stored_text)
+        except Exception as e:
+            logger.error("Pre-translation failed, using original text: %s", e)
+
     java_url = os.getenv("JAVA_BACKEND_URL", "http://localhost:8090")
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -145,7 +163,7 @@ async def _store_reminder_in_java(
                 f"{java_url}/api/reminders",
                 json={
                     "userId": user_id,
-                    "text": text,
+                    "text": stored_text,
                     "scheduledTime": scheduled_time,
                     "method": method,
                     "email": email,
