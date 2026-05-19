@@ -1,12 +1,28 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { api } from '@/services/api'
 import { Cpu, PlusCircle } from 'lucide-vue-next'
 
+interface AdminRobot {
+  id: number
+  serialNumber: string
+  boundUserEmail: string | null
+  createdAt: string
+}
+
+const robots = ref<AdminRobot[]>([])
 const serialNumber = ref('')
 const loading = ref(false)
 const message = ref<string | null>(null)
 const error = ref<string | null>(null)
+
+onMounted(async () => {
+  try {
+    robots.value = await api.getAdminRobots()
+  } catch {
+    // ignore
+  }
+})
 
 async function handleRegister() {
   if (!serialNumber.value.trim()) return
@@ -17,11 +33,17 @@ async function handleRegister() {
     await api.registerRobot(serialNumber.value.trim())
     message.value = `Robot "${serialNumber.value.trim()}" registered successfully`
     serialNumber.value = ''
+    robots.value = await api.getAdminRobots()
   } catch (e) {
     error.value = (e as Error).message
   } finally {
     loading.value = false
   }
+}
+
+function formatTime(iso: string): string {
+  if (!iso) return '-'
+  return new Date(iso).toLocaleString('zh-CN')
 }
 </script>
 
@@ -67,6 +89,38 @@ async function handleRegister() {
 
       <div v-if="error" class="mt-4 p-3 bg-red-600/10 border border-red-500/20 rounded-lg">
         <p class="text-sm text-red-400">{{ error }}</p>
+      </div>
+    </div>
+
+    <!-- Robot list -->
+    <div>
+      <h3 class="text-sm font-medium text-white mb-3">All Robots ({{ robots.length }})</h3>
+      <div v-if="robots.length === 0" class="text-sm text-neutral-600 py-4">
+        No robots registered yet
+      </div>
+      <div v-else class="space-y-2">
+        <div
+          v-for="r in robots"
+          :key="r.id"
+          class="bg-[#141414] border border-[#2A2A2A] rounded-lg p-4 flex items-center justify-between"
+        >
+          <div>
+            <p class="text-sm font-mono text-white">{{ r.serialNumber }}</p>
+            <p class="text-xs text-neutral-500 mt-1">
+              Registered: {{ formatTime(r.createdAt) }}
+              <span v-if="r.boundUserEmail" class="ml-3 text-blue-400">Bound to: {{ r.boundUserEmail }}</span>
+              <span v-else class="ml-3 text-amber-400">Unbound</span>
+            </p>
+          </div>
+          <span
+            :class="[
+              'px-2 py-0.5 rounded text-xs font-medium',
+              r.boundUserEmail ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20' : 'bg-amber-600/10 text-amber-400 border border-amber-500/20',
+            ]"
+          >
+            {{ r.boundUserEmail ? 'Bound' : 'Free' }}
+          </span>
+        </div>
       </div>
     </div>
   </div>

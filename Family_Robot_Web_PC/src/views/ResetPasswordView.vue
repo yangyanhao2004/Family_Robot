@@ -13,6 +13,15 @@ const newPassword = ref('')
 const isLoading = ref(false)
 const errorMsg = ref('')
 
+function goBack() {
+  const token = localStorage.getItem('auth_token')
+  if (token) {
+    router.push({ name: 'dashboard' })
+  } else {
+    router.push({ name: 'login' })
+  }
+}
+
 async function handleSendCode() {
   if (!email.value) return
   isLoading.value = true
@@ -65,7 +74,7 @@ async function handleReset() {
       <div class="w-full max-w-md space-y-8">
         <div class="flex items-center gap-3">
           <button
-            @click="router.push('/login')"
+            @click="goBack"
             class="p-2 hover:bg-[#222] rounded-lg transition-colors text-neutral-400 hover:text-white"
           >
             <ArrowLeft class="w-5 h-5" />

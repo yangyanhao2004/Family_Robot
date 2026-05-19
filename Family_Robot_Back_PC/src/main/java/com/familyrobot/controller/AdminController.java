@@ -1,5 +1,6 @@
 package com.familyrobot.controller;
 
+import com.familyrobot.model.dto.AdminRobotDto;
 import com.familyrobot.model.dto.AdminUserDto;
 import com.familyrobot.model.dto.RobotRegistrationRequest;
 import com.familyrobot.model.entity.Robot;
@@ -74,6 +75,24 @@ public class AdminController {
                 admin.getEmail(), admin.getId(), targetUser.getEmail(), userId);
 
         return ResponseEntity.ok(Map.of("password", plaintext));
+    }
+
+    @GetMapping("/robots")
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<AdminRobotDto>> listRobots(@AuthenticationPrincipal User user) {
+        requireAdmin(user);
+
+        List<Robot> robots = robotRepository.findAll();
+        List<AdminRobotDto> dtos = robots.stream()
+                .map(r -> AdminRobotDto.builder()
+                        .id(r.getId())
+                        .serialNumber(r.getSerialNumber())
+                        .boundUserEmail(r.getUser() != null ? r.getUser().getEmail() : null)
+                        .createdAt(r.getCreatedAt())
+                        .build())
+                .toList();
+
+        return ResponseEntity.ok(dtos);
     }
 
     @PostMapping("/robots")

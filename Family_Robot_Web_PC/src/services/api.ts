@@ -139,6 +139,9 @@ export const api = {
   getUserPassword: (userId: number) =>
     request<{ password: string }>(`/api/admin/users/${userId}/password`),
 
+  getAdminRobots: () =>
+    request<{ id: number; serialNumber: string; boundUserEmail: string | null; createdAt: string }[]>('/api/admin/robots'),
+
   registerRobot: (serialNumber: string) =>
     request<{ message: string }>('/api/admin/robots', {
       method: 'POST',
