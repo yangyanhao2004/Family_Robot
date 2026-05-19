@@ -18,6 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -39,10 +43,14 @@ public class AdminController {
 
     @GetMapping("/users")
     @Transactional(readOnly = true)
-    public ResponseEntity<List<AdminUserDto>> listUsers(@AuthenticationPrincipal User user) {
+    public ResponseEntity<List<AdminUserDto>> listUsers(
+            @AuthenticationPrincipal User user,
+            @RequestParam(required = false) String search) {
         requireAdmin(user);
 
-        List<User> users = userRepository.findAll();
+        List<User> users = (search != null && !search.isBlank())
+                ? userRepository.findFilteredUsers(search.trim())
+                : userRepository.findAll();
         List<Robot> robots = robotRepository.findAll();
 
         List<AdminUserDto> dtos = users.stream()
@@ -79,10 +87,29 @@ public class AdminController {
 
     @GetMapping("/robots")
     @Transactional(readOnly = true)
-    public ResponseEntity<List<AdminRobotDto>> listRobots(@AuthenticationPrincipal User user) {
+    public ResponseEntity<List<AdminRobotDto>> listRobots(
+            @AuthenticationPrincipal User user,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "asc") String sortOrder,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
         requireAdmin(user);
 
-        List<Robot> robots = robotRepository.findAll();
+        String trimmedSearch = (search != null && !search.isBlank()) ? search.trim() : null;
+        LocalDateTime start = parseDateTime(startDate, false);
+        LocalDateTime end = parseDateTime(endDate, true);
+
+        List<Robot> robots = (trimmedSearch != null || start != null || end != null)
+                ? robotRepository.findFilteredRobots(trimmedSearch, start, end)
+                : robotRepository.findAll();
+
+        // Sort
+        if ("desc".equalsIgnoreCase(sortOrder)) {
+            robots.sort(Comparator.comparing(Robot::getCreatedAt).reversed());
+        } else {
+            robots.sort(Comparator.comparing(Robot::getCreatedAt));
+        }
+
         List<AdminRobotDto> dtos = robots.stream()
                 .map(r -> AdminRobotDto.builder()
                         .id(r.getId())
@@ -111,5 +138,19 @@ public class AdminController {
         robotRepository.save(robot);
 
         return ResponseEntity.ok(Map.of("message", "registered"));
+    }
+
+    private LocalDateTime parseDateTime(String value, boolean isEnd) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            if (value.contains("T")) {
+                return LocalDateTime.parse(value);
+            }
+            LocalDate date = LocalDate.parse(value);
+            return isEnd ? date.atTime(LocalTime.MAX) : date.atStartOfDay();
+        } catch (Exception e) {
+            log.warn("Failed to parse date param: {}", value);
+            return null;
+        }
     }
 }

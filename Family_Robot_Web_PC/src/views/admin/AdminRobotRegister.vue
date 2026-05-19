@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/services/api'
 import { Cpu, PlusCircle, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-vue-next'
 
@@ -24,37 +24,34 @@ const filterEnd = ref('')
 const filterStartTime = ref('')
 const filterEndTime = ref('')
 
-const filteredRobots = computed(() => {
-  let result = [...robots.value]
+let fetchTimer: ReturnType<typeof setTimeout> | null = null
 
-  // Search
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.trim().toLowerCase()
-    result = result.filter(r => r.serialNumber.toLowerCase().includes(q))
+async function fetchRobots() {
+  try {
+    const params: Record<string, string> = {}
+    if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
+    params.sortOrder = sortAsc.value ? 'asc' : 'desc'
+    if (filterStart.value) {
+      const d = filterStart.value
+      params.startDate = filterStartTime.value ? `${d}T${filterStartTime.value}` : d
+    }
+    if (filterEnd.value) {
+      const d = filterEnd.value
+      params.endDate = filterEndTime.value ? `${d}T${filterEndTime.value}` : d
+    }
+    robots.value = await api.getAdminRobots(params)
+  } catch {
+    // ignore
   }
+}
 
-  // Time range filter
-  if (filterStart.value) {
-    const start = filterStartTime.value
-      ? new Date(filterStart.value + 'T' + filterStartTime.value).getTime()
-      : new Date(filterStart.value + 'T00:00:00').getTime()
-    result = result.filter(r => new Date(r.createdAt).getTime() >= start)
-  }
-  if (filterEnd.value) {
-    const end = filterEndTime.value
-      ? new Date(filterEnd.value + 'T' + filterEndTime.value).getTime()
-      : new Date(filterEnd.value + 'T23:59:59').getTime()
-    result = result.filter(r => new Date(r.createdAt).getTime() <= end)
-  }
+function onFilterChange() {
+  if (fetchTimer) clearTimeout(fetchTimer)
+  fetchTimer = setTimeout(fetchRobots, 300)
+}
 
-  // Sort by createdAt
-  result.sort((a, b) => {
-    const cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-    return sortAsc.value ? cmp : -cmp
-  })
-
-  return result
-})
+watch([searchQuery, filterStart, filterEnd, filterStartTime, filterEndTime], onFilterChange)
+watch(sortAsc, () => fetchRobots())
 
 function clearFilters() {
   searchQuery.value = ''
@@ -69,12 +66,8 @@ const hasFilters = computed(() =>
   searchQuery.value.trim() || filterStart.value || filterEnd.value || !sortAsc.value
 )
 
-onMounted(async () => {
-  try {
-    robots.value = await api.getAdminRobots()
-  } catch {
-    // ignore
-  }
+onMounted(() => {
+  fetchRobots()
 })
 
 async function handleRegister() {
@@ -86,7 +79,7 @@ async function handleRegister() {
     await api.registerRobot(serialNumber.value.trim())
     message.value = `Robot "${serialNumber.value.trim()}" registered successfully`
     serialNumber.value = ''
-    robots.value = await api.getAdminRobots()
+    fetchRobots()
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -148,7 +141,7 @@ function formatTime(iso: string): string {
     <!-- Robot list -->
     <div>
       <div class="flex items-center justify-between mb-3">
-        <h3 class="text-sm font-medium text-white">All Robots ({{ filteredRobots.length }})</h3>
+        <h3 class="text-sm font-medium text-white">All Robots ({{ robots.length }})</h3>
         <button
           v-if="hasFilters"
           @click="clearFilters"
@@ -167,7 +160,7 @@ function formatTime(iso: string): string {
           <input
             v-model="searchQuery"
             type="text"
-            placeholder="Search serial number..."
+            placeholder="Search serial number or email..."
             class="w-full bg-[#141414] border border-[#2A2A2A] text-white rounded-lg pl-9 pr-4 py-2 text-sm outline-none focus:border-blue-500 transition-colors font-mono"
           />
         </div>
@@ -214,13 +207,13 @@ function formatTime(iso: string): string {
         </div>
       </div>
 
-      <div v-if="filteredRobots.length === 0" class="text-sm text-neutral-600 py-4">
-        <span v-if="robots.length === 0">No robots registered yet</span>
+      <div v-if="robots.length === 0" class="text-sm text-neutral-600 py-4">
+        <span v-if="!hasFilters">No robots registered yet</span>
         <span v-else>No robots match the current filters</span>
       </div>
       <div v-else class="space-y-2">
         <div
-          v-for="r in filteredRobots"
+          v-for="r in robots"
           :key="r.id"
           class="bg-[#141414] border border-[#2A2A2A] rounded-lg p-4 flex items-center justify-between"
         >

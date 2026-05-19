@@ -133,14 +133,25 @@ export const api = {
     request<void>(`/api/reminders/${id}`, { method: 'DELETE' }),
 
   // ---- Admin ----
-  getAdminUsers: () =>
-    request<{ userId: number; email: string; name: string; role: string; robotSerialNumbers: string[] }[]>('/api/admin/users'),
+  getAdminUsers: (search?: string) => {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    const qs = params.toString()
+    return request<{ userId: number; email: string; name: string; role: string; robotSerialNumbers: string[] }[]>(`/api/admin/users${qs ? '?' + qs : ''}`)
+  },
 
   getUserPassword: (userId: number) =>
     request<{ password: string }>(`/api/admin/users/${userId}/password`),
 
-  getAdminRobots: () =>
-    request<{ id: number; serialNumber: string; boundUserEmail: string | null; createdAt: string }[]>('/api/admin/robots'),
+  getAdminRobots: (params?: { search?: string; sortOrder?: string; startDate?: string; endDate?: string }) => {
+    const qs = new URLSearchParams()
+    if (params?.search) qs.set('search', params.search)
+    if (params?.sortOrder) qs.set('sortOrder', params.sortOrder)
+    if (params?.startDate) qs.set('startDate', params.startDate)
+    if (params?.endDate) qs.set('endDate', params.endDate)
+    const str = qs.toString()
+    return request<{ id: number; serialNumber: string; boundUserEmail: string | null; createdAt: string }[]>(`/api/admin/robots${str ? '?' + str : ''}`)
+  },
 
   registerRobot: (serialNumber: string) =>
     request<{ message: string }>('/api/admin/robots', {

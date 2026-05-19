@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { api } from '@/services/api'
 import { Eye, EyeOff, Search, X } from 'lucide-vue-next'
 
@@ -19,24 +19,27 @@ const loadingPassword = ref<Record<number, boolean>>({})
 
 const searchQuery = ref('')
 
-const filteredUsers = computed(() => {
-  if (!searchQuery.value.trim()) return users.value
-  const q = searchQuery.value.trim().toLowerCase()
-  return users.value.filter(u =>
-    u.name.toLowerCase().includes(q) ||
-    u.email.toLowerCase().includes(q) ||
-    u.robotSerialNumbers.some(s => s.toLowerCase().includes(q))
-  )
-})
+let fetchTimer: ReturnType<typeof setTimeout> | null = null
 
-onMounted(async () => {
+async function fetchUsers() {
+  loading.value = true
+  error.value = null
   try {
-    users.value = await api.getAdminUsers()
+    users.value = await api.getAdminUsers(searchQuery.value.trim() || undefined)
   } catch (e) {
     error.value = (e as Error).message
   } finally {
     loading.value = false
   }
+}
+
+watch(searchQuery, () => {
+  if (fetchTimer) clearTimeout(fetchTimer)
+  fetchTimer = setTimeout(fetchUsers, 300)
+})
+
+onMounted(() => {
+  fetchUsers()
 })
 
 async function revealPassword(userId: number) {
@@ -92,14 +95,14 @@ async function revealPassword(userId: number) {
       <p class="text-xs mt-1">{{ error }}</p>
     </div>
 
-    <div v-else-if="filteredUsers.length === 0" class="text-neutral-500 py-8 text-center">
+    <div v-else-if="users.length === 0" class="text-neutral-500 py-8 text-center">
       <span v-if="!searchQuery">No users found</span>
       <span v-else>No users match "{{ searchQuery }}"</span>
     </div>
 
     <div v-else class="space-y-3">
       <div
-        v-for="user in filteredUsers"
+        v-for="user in users"
         :key="user.userId"
         class="bg-[#141414] border border-[#2A2A2A] rounded-lg overflow-hidden"
       >
