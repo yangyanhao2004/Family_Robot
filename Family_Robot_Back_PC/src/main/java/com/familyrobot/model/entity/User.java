@@ -34,4 +34,8 @@ public class User {
     private String role = "User";
 
     private LocalDateTime lastLogin;
+
+    @Column(name = "created_at", nullable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
 }
