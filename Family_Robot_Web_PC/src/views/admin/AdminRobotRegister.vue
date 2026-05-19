@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from '@/services/api'
-import { Cpu, PlusCircle } from 'lucide-vue-next'
+import { Cpu, PlusCircle, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-vue-next'
 
 interface AdminRobot {
   id: number
@@ -15,6 +15,59 @@ const serialNumber = ref('')
 const loading = ref(false)
 const message = ref<string | null>(null)
 const error = ref<string | null>(null)
+
+// Search / Sort / Filter
+const searchQuery = ref('')
+const sortAsc = ref(true)
+const filterStart = ref('')
+const filterEnd = ref('')
+const filterStartTime = ref('')
+const filterEndTime = ref('')
+
+const filteredRobots = computed(() => {
+  let result = [...robots.value]
+
+  // Search
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.trim().toLowerCase()
+    result = result.filter(r => r.serialNumber.toLowerCase().includes(q))
+  }
+
+  // Time range filter
+  if (filterStart.value) {
+    const start = filterStartTime.value
+      ? new Date(filterStart.value + 'T' + filterStartTime.value).getTime()
+      : new Date(filterStart.value + 'T00:00:00').getTime()
+    result = result.filter(r => new Date(r.createdAt).getTime() >= start)
+  }
+  if (filterEnd.value) {
+    const end = filterEndTime.value
+      ? new Date(filterEnd.value + 'T' + filterEndTime.value).getTime()
+      : new Date(filterEnd.value + 'T23:59:59').getTime()
+    result = result.filter(r => new Date(r.createdAt).getTime() <= end)
+  }
+
+  // Sort by createdAt
+  result.sort((a, b) => {
+    const cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    return sortAsc.value ? cmp : -cmp
+  })
+
+  return result
+})
+
+function clearFilters() {
+  searchQuery.value = ''
+  filterStart.value = ''
+  filterEnd.value = ''
+  filterStartTime.value = ''
+  filterEndTime.value = ''
+  sortAsc.value = true
+}
+
+const hasFilters = computed(() =>
+  searchQuery.value.trim() || filterStart.value || filterEnd.value || !sortAsc.value
+)
 
 onMounted(async () => {
   try {
@@ -94,13 +147,80 @@ function formatTime(iso: string): string {
 
     <!-- Robot list -->
     <div>
-      <h3 class="text-sm font-medium text-white mb-3">All Robots ({{ robots.length }})</h3>
-      <div v-if="robots.length === 0" class="text-sm text-neutral-600 py-4">
-        No robots registered yet
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-medium text-white">All Robots ({{ filteredRobots.length }})</h3>
+        <button
+          v-if="hasFilters"
+          @click="clearFilters"
+          class="flex items-center gap-1 text-xs text-neutral-400 hover:text-white transition-colors"
+        >
+          <X class="w-3 h-3" />
+          Clear filters
+        </button>
+      </div>
+
+      <!-- Toolbar: Search + Sort + Filter -->
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <!-- Search -->
+        <div class="relative flex-1 min-w-[200px] max-w-xs">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search serial number..."
+            class="w-full bg-[#141414] border border-[#2A2A2A] text-white rounded-lg pl-9 pr-4 py-2 text-sm outline-none focus:border-blue-500 transition-colors font-mono"
+          />
+        </div>
+
+        <!-- Sort toggle -->
+        <button
+          @click="sortAsc = !sortAsc"
+          class="flex items-center gap-1.5 px-3 py-2 bg-[#141414] border border-[#2A2A2A] rounded-lg text-sm text-neutral-300 hover:text-white hover:border-[#444] transition-colors"
+          title="Toggle sort order"
+        >
+          <ArrowUpDown v-if="false" class="w-4 h-4" />
+          <ArrowUp v-if="sortAsc" class="w-4 h-4 text-blue-400" />
+          <ArrowDown v-else class="w-4 h-4 text-blue-400" />
+          {{ sortAsc ? 'Oldest first' : 'Newest first' }}
+        </button>
+
+        <!-- Date range filter -->
+        <div class="flex items-center gap-2">
+          <input
+            v-model="filterStart"
+            type="date"
+            class="bg-[#141414] border border-[#2A2A2A] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 transition-colors w-[150px]"
+            title="Start date"
+          />
+          <input
+            v-model="filterStartTime"
+            type="time"
+            class="bg-[#141414] border border-[#2A2A2A] text-white rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-500 transition-colors w-[110px]"
+            title="Start time (optional)"
+          />
+          <span class="text-neutral-500 text-xs">—</span>
+          <input
+            v-model="filterEnd"
+            type="date"
+            class="bg-[#141414] border border-[#2A2A2A] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 transition-colors w-[150px]"
+            title="End date"
+          />
+          <input
+            v-model="filterEndTime"
+            type="time"
+            class="bg-[#141414] border border-[#2A2A2A] text-white rounded-lg px-2 py-2 text-sm outline-none focus:border-blue-500 transition-colors w-[110px]"
+            title="End time (optional)"
+          />
+        </div>
+      </div>
+
+      <div v-if="filteredRobots.length === 0" class="text-sm text-neutral-600 py-4">
+        <span v-if="robots.length === 0">No robots registered yet</span>
+        <span v-else>No robots match the current filters</span>
       </div>
       <div v-else class="space-y-2">
         <div
-          v-for="r in robots"
+          v-for="r in filteredRobots"
           :key="r.id"
           class="bg-[#141414] border border-[#2A2A2A] rounded-lg p-4 flex items-center justify-between"
         >
