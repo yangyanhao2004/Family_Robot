@@ -88,6 +88,7 @@ public class VerificationService {
         log.info("Verification code sent to {}", email);
     }
 
+    @Transactional
     public void verify(String email, String code) {
         VerificationCode vc = findAndValidate(email, TYPE_REGISTER, code);
 

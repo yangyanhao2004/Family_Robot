@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -36,6 +37,7 @@ public class AdminController {
     }
 
     @GetMapping("/users")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<AdminUserDto>> listUsers(@AuthenticationPrincipal User user) {
         requireAdmin(user);
 
