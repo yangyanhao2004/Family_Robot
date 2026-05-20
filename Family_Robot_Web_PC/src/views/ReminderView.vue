@@ -222,7 +222,7 @@ onMounted(loadReminders)
         <div class="flex items-center gap-2 pt-1">
           <button
             @click="handleCreate"
-            :disabled="creating"
+            :disabled="creating || !editForm.text.trim()"
             class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors disabled:opacity-50"
           >
             {{ creating ? '创建中...' : '创建' }}

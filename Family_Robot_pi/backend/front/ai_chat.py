@@ -36,6 +36,7 @@ async def handle_ai_chat(message: Dict[str, Any]):
     payload = message.get("payload", {})
     user_id = payload.get("user_id")
     user_text = payload.get("message", "").strip()
+    user_email = payload.get("email", "")
 
     if not user_id or not user_text:
         await manager.send_to_web({
@@ -47,7 +48,11 @@ async def handle_ai_chat(message: Dict[str, Any]):
     session = session_manager.get_or_create(int(user_id))
     session.add_message("user", user_text)
 
-    api_messages = [{"role": "system", "content": get_web_ai_system_prompt()}]
+    system_prompt = get_web_ai_system_prompt()
+    if user_email:
+        system_prompt += f"\n\nThe current user's email address is {user_email}. When setting EMAIL reminders for this user, always use this email address. Do NOT ask the user for their email."
+
+    api_messages = [{"role": "system", "content": system_prompt}]
     api_messages.extend(session.get_messages())
 
     try:

@@ -3,9 +3,11 @@ package com.familyrobot.controller;
 import com.familyrobot.model.dto.CreateReminderRequest;
 import com.familyrobot.model.dto.ReminderDto;
 import com.familyrobot.model.dto.UpdateReminderRequest;
+import com.familyrobot.model.entity.User;
 import com.familyrobot.service.ReminderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,8 +27,10 @@ public class ReminderController {
     }
 
     @PutMapping("/{id}")
-    public Map<String, String> update(@PathVariable Long id, @RequestBody UpdateReminderRequest req) {
-        reminderService.updateReminder(id, req);
+    public Map<String, String> update(@PathVariable Long id,
+                                       @RequestBody UpdateReminderRequest req,
+                                       @AuthenticationPrincipal User user) {
+        reminderService.updateReminder(id, req, user.getId());
         return Map.of("message", "Reminder updated");
     }
 
@@ -36,8 +40,9 @@ public class ReminderController {
     }
 
     @DeleteMapping("/{id}")
-    public Map<String, String> delete(@PathVariable Long id) {
-        reminderService.deleteReminder(id);
+    public Map<String, String> delete(@PathVariable Long id,
+                                       @AuthenticationPrincipal User user) {
+        reminderService.deleteReminder(id, user.getId());
         return Map.of("message", "Reminder deleted");
     }
 }

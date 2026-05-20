@@ -39,6 +39,17 @@ export function getUserIdFromToken(): number {
   }
 }
 
+export function getUserEmailFromToken(): string {
+  try {
+    const token = localStorage.getItem('auth_token')
+    if (!token) return ''
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.email || ''
+  } catch {
+    return ''
+  }
+}
+
 type MessageListener = (msg: WebSocketMessage) => void;
 
 class WebSocketService {
@@ -143,11 +154,11 @@ class WebSocketService {
     });
   }
 
-  sendAIChat(userId: number, message: string): void {
+  sendAIChat(userId: number, message: string, email?: string): void {
     if (!this.isConnected() || !this.isRegistered) return;
     this.sendRaw({
       type: 'ai_chat',
-      payload: { user_id: userId, message },
+      payload: { user_id: userId, message, email: email || getUserEmailFromToken() },
     });
   }
 

@@ -49,8 +49,14 @@ public class ReminderService {
         if ("EMAIL".equals(req.getMethod()) && (req.getEmail() == null || req.getEmail().isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "email is required for EMAIL method");
         }
+        if (req.getText() == null || req.getText().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "reminder text is required");
+        }
 
         LocalDateTime scheduledTime = parseReminderDateTime(req.getScheduledTime());
+        if (!scheduledTime.isAfter(LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "scheduledTime must be in the future");
+        }
 
         Reminder reminder = Reminder.builder()
                 .userId(req.getUserId())
@@ -69,9 +75,13 @@ public class ReminderService {
         return toDto(reminder);
     }
 
-    public ReminderDto updateReminder(Long id, UpdateReminderRequest req) {
+    public ReminderDto updateReminder(Long id, UpdateReminderRequest req, Long requestingUserId) {
         Reminder reminder = reminderRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reminder not found"));
+
+        if (!reminder.getUserId().equals(requestingUserId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized to edit this reminder");
+        }
 
         if (req.getText() != null) reminder.setText(req.getText());
         if (req.getScheduledTime() != null) {
@@ -95,11 +105,13 @@ public class ReminderService {
                 .stream().map(this::toDto).collect(Collectors.toList());
     }
 
-    public void deleteReminder(Long id) {
-        if (!reminderRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Reminder not found");
+    public void deleteReminder(Long id, Long requestingUserId) {
+        Reminder reminder = reminderRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Reminder not found"));
+        if (!reminder.getUserId().equals(requestingUserId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not authorized to delete this reminder");
         }
-        reminderRepository.deleteById(id);
+        reminderRepository.delete(reminder);
         log.info("Reminder #{} deleted", id);
     }
 
