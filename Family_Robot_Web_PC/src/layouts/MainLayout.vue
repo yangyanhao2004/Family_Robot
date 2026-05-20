@@ -87,7 +87,7 @@ onUnmounted(() => {
       </main>
 
       <!-- Right Panel -->
-      <aside class="w-[320px] bg-[#1A1A1A] border-l border-[#2A2A2A] flex flex-col shrink-0 z-10 shadow-[-8px_0_24px_rgba(0,0,0,0.2)]">
+      <aside class="w-[400px] bg-[#1A1A1A] border-l border-[#2A2A2A] flex flex-col shrink-0 z-10 shadow-[-8px_0_24px_rgba(0,0,0,0.2)]">
         <div class="p-5 border-b border-[#2A2A2A] bg-[#1E1E1E]">
           <!-- Disconnected state -->
           <button
