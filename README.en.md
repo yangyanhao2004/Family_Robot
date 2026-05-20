@@ -137,6 +137,100 @@ python main.py --mode all
 
 ---
 
+## Ports & Network Configuration
+
+### Port Assignment
+
+| Port | Machine | Service | Protocol |
+|------|---------|---------|----------|
+| **8080** | Raspberry Pi | Python FastAPI backend | HTTP + WebSocket |
+| **8090** | PC | Java Spring Boot backend | HTTP REST |
+| **5173** | PC | Vue 3 dev server | HTTP |
+| **3306** | PC / Server | MySQL database | TCP |
+| **11434** | Raspberry Pi | Ollama local LLM (optional) | HTTP |
+
+### Deployment Scenarios & IP Configuration
+
+The default setup assumes the **PC and Raspberry Pi are on the same LAN** (Wi-Fi hotspot or router).
+
+**Typical topology:**
+
+```
+PC (192.168.137.1) ←──Wi-Fi──→ Raspberry Pi (192.168.137.90)
+    │                                │
+    ├─ Java backend :8090            ├─ Python backend :8080
+    ├─ Vue frontend :5173            ├─ Jarvis voice assistant
+    └─ MySQL :3306                   └─ STM32 (USB-UART)
+```
+
+**4 places where IP addresses need to be configured:**
+
+| Location | Config Key | Value |
+|----------|-----------|-------|
+| `Family_Robot_Web_PC/.env.local` | `VITE_BACKEND_HTTP_URL` | **Pi IP** — browser connects to Python backend |
+| `Family_Robot_Web_PC/.env.local` | `VITE_JAVA_API_URL` | **PC IP** — browser connects to Java backend |
+| `Family_Robot_Back_PC/application.yml` | `PYTHON_BACKEND_URL` | **Pi IP** — Java calls Python for VOICE reminders |
+| `Family_Robot_pi/.env` | `JAVA_BACKEND_URL` | **PC IP** — Pi calls Java to store reminders |
+
+### Scenario A: All on one PC (no Raspberry Pi)
+
+If the Python backend also runs on the PC (no camera/voice hardware):
+
+```
+VITE_BACKEND_HTTP_URL=http://localhost:8080
+VITE_JAVA_API_URL=http://localhost:8090
+PYTHON_BACKEND_URL=http://localhost:8080
+JAVA_BACKEND_URL=http://localhost:8090
+```
+
+Set all IPs to `localhost`.
+
+### Scenario B: PC + Pi Separate (standard setup)
+
+PC (192.168.137.1) runs Java + frontend, Pi (192.168.137.90) runs Python:
+
+```
+VITE_BACKEND_HTTP_URL=http://192.168.137.90:8080   # browser → Pi
+VITE_JAVA_API_URL=http://192.168.137.1:8090         # browser → local Java
+PYTHON_BACKEND_URL=http://192.168.137.90:8080       # Java → Pi
+JAVA_BACKEND_URL=http://192.168.137.1:8090          # Pi → PC
+```
+
+> **Critical**: `VITE_BACKEND_HTTP_URL` runs in the user's browser, so it MUST use the LAN IP (e.g. `192.168.x.x`). `localhost` in the browser refers to the user's own machine, not the Pi.
+
+### Finding the Pi's IP
+
+On the Pi terminal:
+```bash
+hostname -I
+```
+or
+```bash
+ip addr show wlan0 | grep "inet "
+```
+
+### Firewall
+
+- Pi port **8080** must allow inbound connections from the PC
+- PC port **8090** must allow inbound connections from the Pi (for VOICE reminder callbacks)
+- PC port **5173** is dev-only; production builds generate static files
+- Windows Firewall will prompt on first run — click "Allow access"
+
+### Port Conflict Check
+
+Check for port conflicts before starting:
+
+```bash
+# On Raspberry Pi
+lsof -i :8080
+
+# On Windows PC
+netstat -ano | findstr "8090"
+netstat -ano | findstr "5173"
+```
+
+---
+
 ## FAQ
 
 ### 1. No video / robot control in the browser

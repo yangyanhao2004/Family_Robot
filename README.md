@@ -137,6 +137,100 @@ python main.py --mode all
 
 ---
 
+## 端口与网络配置
+
+### 端口分配
+
+| 端口 | 所在机器 | 服务 | 协议 |
+|------|----------|------|------|
+| **8080** | 树莓派 | Python FastAPI 后端 | HTTP + WebSocket |
+| **8090** | PC | Java Spring Boot 后端 | HTTP REST |
+| **5173** | PC | Vue 3 开发服务器 | HTTP |
+| **3306** | PC / 服务器 | MySQL 数据库 | TCP |
+| **11434** | 树莓派 | Ollama 本地 LLM（可选） | HTTP |
+
+### 部署场景与 IP 配置
+
+本项目默认假设 **PC 和树莓派在同一局域网**，通过 Wi-Fi 热点或路由器连接。
+
+**典型拓扑：**
+
+```
+PC (192.168.137.1) ←──Wi-Fi──→ 树莓派 (192.168.137.90)
+    │                                │
+    ├─ Java 后端 :8090               ├─ Python 后端 :8080
+    ├─ Vue 前端 :5173                ├─ 语音助手 Jarvis
+    └─ MySQL :3306                   └─ STM32 (USB-UART)
+```
+
+**需要修改 IP 的地方（共 4 处）：**
+
+| 位置 | 配置项 | 说明 |
+|------|--------|------|
+| `Family_Robot_Web_PC/.env.local` | `VITE_BACKEND_HTTP_URL` | 前端连接 Python 后端，填**树莓派 IP** |
+| `Family_Robot_Web_PC/.env.local` | `VITE_JAVA_API_URL` | 前端连接 Java 后端，填**PC IP** |
+| `Family_Robot_Back_PC/application.yml` | `PYTHON_BACKEND_URL` | Java 调用 Python（发送 VOICE 提醒），填**树莓派 IP** |
+| `Family_Robot_pi/.env` | `JAVA_BACKEND_URL` | Python 调用 Java（存储提醒），填 **PC IP** |
+
+### 场景一：全部在本机开发（无树莓派）
+
+如果 Python 后端也在 PC 上运行（不使用树莓派的摄像头和语音功能）：
+
+```
+VITE_BACKEND_HTTP_URL=http://localhost:8080
+VITE_JAVA_API_URL=http://localhost:8090
+PYTHON_BACKEND_URL=http://localhost:8080
+JAVA_BACKEND_URL=http://localhost:8090
+```
+
+将所有 IP 都设为 `localhost`。
+
+### 场景二：PC + 树莓派分离部署（标准场景）
+
+PC（192.168.137.1）运行 Java + 前端，树莓派（192.168.137.90）运行 Python：
+
+```
+VITE_BACKEND_HTTP_URL=http://192.168.137.90:8080   # 前端 → 树莓派
+VITE_JAVA_API_URL=http://192.168.137.1:8090         # 前端 → 本机 Java
+PYTHON_BACKEND_URL=http://192.168.137.90:8080       # Java → 树莓派
+JAVA_BACKEND_URL=http://192.168.137.1:8090          # 树莓派 → PC
+```
+
+> **关键**：`VITE_BACKEND_HTTP_URL` 运行在浏览器中，所以必须填**局域网 IP**（如 `192.168.x.x`），不能填 `localhost`（`localhost` 在浏览器中指向用户本机，而非树莓派）。
+
+### 查看树莓派 IP
+
+在树莓派终端执行：
+```bash
+hostname -I
+```
+或
+```bash
+ip addr show wlan0 | grep "inet "
+```
+
+### 防火墙注意事项
+
+- 树莓派端口 **8080** 需要允许来自 PC 的入站连接
+- PC 端口 **8090** 需要允许来自树莓派的入站连接（用于 VOICE 提醒回调）
+- PC 端口 **5173** 仅在开发时使用，生产构建后前端为静态文件
+- 如果使用 Windows 防火墙，首次运行时会弹出允许提示，点击"允许访问"
+
+### 端口冲突检查
+
+启动前确认端口未被占用：
+
+```bash
+# 树莓派
+lsof -i :8080
+
+# Windows PC
+netstat -ano | findstr "8090"
+netstat -ano | findstr "5173"
+```
+
+---
+
 ## 常见问题
 
 ### 1. 前端连接不上视频/机器人控制
