@@ -1,0 +1,22 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# STM32 build artifacts
+Family_Robot_STM32/FreeRTOS/MDK-ARM/FreeRTOS/
+Family_Robot_STM32/FreeRTOS/MDK-ARM/*.uvguix.*
+Family_Robot_STM32/FreeRTOS/MDK-ARM/*.uvoptx
+
+# Project-local files (not for GitHub)
+CLAUDE.md
+TEST_CASES.md
+
+# Claude
+.claude/
+stop
