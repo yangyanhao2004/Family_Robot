@@ -16,6 +16,7 @@ Family_Robot_STM32/FreeRTOS/MDK-ARM/*.uvoptx
 # Project-local files (not for GitHub)
 CLAUDE.md
 TEST_CASES.md
+Family_Robot_Back_PC/src/main/resources/application.yml
 
 # Claude
 .claude/

@@ -2,8 +2,8 @@ package com.familyrobot.service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -12,10 +12,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
-    private static final String FROM = "yangyanhao2004@qq.com";
     private static final String TEMPLATE = """
             <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto;">
                 <h2 style="color: #2563eb;">Family Robot</h2>
@@ -28,6 +26,13 @@ public class EmailService {
             """;
 
     private final JavaMailSender mailSender;
+    private final String from;
+
+    public EmailService(JavaMailSender mailSender,
+                        @Value("${spring.mail.username}") String from) {
+        this.mailSender = mailSender;
+        this.from = from;
+    }
 
     public void sendVerificationEmail(String to, String subject, String label, String code) {
         String footer = "This code expires in 5 minutes. If you did not request this, please ignore this email.";
@@ -53,7 +58,7 @@ public class EmailService {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            helper.setFrom(FROM);
+            helper.setFrom(from);
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);

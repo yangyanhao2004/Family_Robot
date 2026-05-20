@@ -1,3 +1,14 @@
+# =============================================================================
+# Family Robot — Java Backend Configuration Template
+# =============================================================================
+# How to use:
+#   1. Copy this file to application.yml in the same directory
+#   2. Fill in your own values (especially the SMTP credentials)
+#   3. application.yml is git-ignored and will NOT be committed
+#
+# All values support environment variable overrides (see README for details).
+# =============================================================================
+
 server:
   port: ${SERVER_PORT:8090}
   error:
@@ -30,8 +41,10 @@ spring:
   mail:
     host: smtp.qq.com
     port: 587
-    username: ${SMTP_USERNAME:}
-    password: ${SMTP_PASSWORD:}
+    # IMPORTANT: Replace with your own QQ email and SMTP authorization code
+    # Go to QQ Mail → Settings → Accounts → POP3/SMTP Service → Generate Authorization Code
+    username: ${SMTP_USERNAME:your_qq_email@qq.com}
+    password: ${SMTP_PASSWORD:your_smtp_authorization_code}
     properties:
       mail:
         smtp:
