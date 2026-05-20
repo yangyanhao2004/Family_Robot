@@ -54,7 +54,7 @@ public class AdminController {
 
         List<User> users = (search != null && !search.isBlank())
                 ? userRepository.findFilteredUsers(search.trim())
-                : userRepository.findAll();
+                : userRepository.findAllByRoleNot("Admin");
         List<Robot> robots = robotRepository.findAll();
 
         List<AdminUserDto> dtos = users.stream()
