@@ -10,4 +10,6 @@ public interface CommandLogRepository extends JpaRepository<CommandLog, Long> {
     long countByTimestampAfter(LocalDateTime after);
 
     void deleteByTimestampBefore(LocalDateTime timestamp);
+
+    void deleteAllByUserId(Long userId);
 }

@@ -20,4 +20,6 @@ public interface RobotRepository extends JpaRepository<Robot, Long> {
     List<Robot> findFilteredRobots(@Param("search") String search,
                                    @Param("start") LocalDateTime start,
                                    @Param("end") LocalDateTime end);
+
+    void deleteAllByUserId(Long userId);
 }

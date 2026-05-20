@@ -85,6 +85,11 @@ mvn spring-boot:run
 - Email: `admin@familybot.com`
 - Password: `admin123`
 
+**Admin panel features**:
+- User management: search users (by name/email/robot serial), view plaintext password, **delete user** (cascade-deletes robots/photos/reminders and all associated data)
+- Robot management: search/sort/date filter, register new robots, **delete robot** (cascade-deletes bound user if exists)
+- Admin account cannot delete itself
+
 ### Step 3: Web Frontend (PC, Port 5173)
 
 ```bash

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { api } from '@/services/api'
-import { Cpu, PlusCircle, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-vue-next'
+import { Cpu, PlusCircle, Search, ArrowUpDown, ArrowUp, ArrowDown, X, Trash2 } from 'lucide-vue-next'
 
 interface AdminRobot {
   id: number
@@ -84,6 +84,21 @@ async function handleRegister() {
     error.value = (e as Error).message
   } finally {
     loading.value = false
+  }
+}
+
+const deletingRobotId = ref<number | null>(null)
+
+async function deleteRobot(robotId: number) {
+  if (!window.confirm('Delete this robot? If bound to a user, the user and ALL related data will also be deleted. This cannot be undone.')) return
+  deletingRobotId.value = robotId
+  try {
+    await api.deleteAdminRobot(robotId)
+    robots.value = robots.value.filter(r => r.id !== robotId)
+  } catch (e) {
+    alert((e as Error).message)
+  } finally {
+    deletingRobotId.value = null
   }
 }
 
@@ -225,14 +240,24 @@ function formatTime(iso: string): string {
               <span v-else class="ml-3 text-amber-400">Unbound</span>
             </p>
           </div>
-          <span
-            :class="[
-              'px-2 py-0.5 rounded text-xs font-medium',
-              r.boundUserEmail ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20' : 'bg-amber-600/10 text-amber-400 border border-amber-500/20',
-            ]"
-          >
-            {{ r.boundUserEmail ? 'Bound' : 'Free' }}
-          </span>
+          <div class="flex items-center gap-2">
+            <span
+              :class="[
+                'px-2 py-0.5 rounded text-xs font-medium',
+                r.boundUserEmail ? 'bg-blue-600/10 text-blue-400 border border-blue-500/20' : 'bg-amber-600/10 text-amber-400 border border-amber-500/20',
+              ]"
+            >
+              {{ r.boundUserEmail ? 'Bound' : 'Free' }}
+            </span>
+            <button
+              @click="deleteRobot(r.id)"
+              :disabled="deletingRobotId === r.id"
+              class="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-600/10 rounded transition-colors disabled:opacity-50"
+              title="Delete robot"
+            >
+              <Trash2 class="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

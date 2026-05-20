@@ -5,8 +5,7 @@ import com.familyrobot.model.dto.AdminUserDto;
 import com.familyrobot.model.dto.RobotRegistrationRequest;
 import com.familyrobot.model.entity.Robot;
 import com.familyrobot.model.entity.User;
-import com.familyrobot.repository.RobotRepository;
-import com.familyrobot.repository.UserRepository;
+import com.familyrobot.repository.*;
 import com.familyrobot.security.AesPasswordEncoder;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +32,11 @@ public class AdminController {
 
     private final UserRepository userRepository;
     private final RobotRepository robotRepository;
+    private final PhotoRepository photoRepository;
+    private final CommandLogRepository commandLogRepository;
+    private final VerificationCodeRepository verificationCodeRepository;
+    private final SettingsRepository settingsRepository;
+    private final ReminderRepository reminderRepository;
     private final AesPasswordEncoder aesPasswordEncoder;
 
     private void requireAdmin(User user) {
@@ -138,6 +142,75 @@ public class AdminController {
         robotRepository.save(robot);
 
         return ResponseEntity.ok(Map.of("message", "registered"));
+    }
+
+    @DeleteMapping("/users/{userId}")
+    @Transactional
+    public ResponseEntity<Map<String, String>> deleteUser(
+            @AuthenticationPrincipal User admin,
+            @PathVariable Long userId) {
+        requireAdmin(admin);
+
+        User target = userRepository.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (target.getId().equals(admin.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot delete your own admin account");
+        }
+
+        String email = target.getEmail();
+        log.warn("Admin {} (id={}) is deleting user {} (id={}, email={}) and all related data",
+                admin.getEmail(), admin.getId(), target.getName(), userId, email);
+
+        // Cascade delete all related data (order matters due to FK constraints)
+        robotRepository.deleteAllByUserId(userId);
+        photoRepository.deleteAllByUserId(userId);
+        commandLogRepository.deleteAllByUserId(userId);
+        settingsRepository.deleteByUserId(userId);
+        reminderRepository.deleteAllByUserId(userId);
+        verificationCodeRepository.deleteAllByEmail(email);
+        userRepository.delete(target);
+
+        log.info("User {} and all related data deleted successfully", userId);
+        return ResponseEntity.ok(Map.of("message", "User and all related data deleted"));
+    }
+
+    @DeleteMapping("/robots/{robotId}")
+    @Transactional
+    public ResponseEntity<Map<String, String>> deleteRobot(
+            @AuthenticationPrincipal User admin,
+            @PathVariable Long robotId) {
+        requireAdmin(admin);
+
+        Robot target = robotRepository.findById(robotId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Robot not found"));
+
+        User boundUser = target.getUser();
+        log.warn("Admin {} (id={}) is deleting robot #{} (serial={})",
+                admin.getEmail(), admin.getId(), robotId, target.getSerialNumber());
+
+        // Delete robot first, then cascade-delete bound user if exists
+        robotRepository.delete(target);
+
+        if (boundUser != null) {
+            Long userId = boundUser.getId();
+            String email = boundUser.getEmail();
+            log.warn("Cascade-deleting bound user {} (id={}, email={})", boundUser.getName(), userId, email);
+
+            robotRepository.deleteAllByUserId(userId);
+            photoRepository.deleteAllByUserId(userId);
+            commandLogRepository.deleteAllByUserId(userId);
+            settingsRepository.deleteByUserId(userId);
+            reminderRepository.deleteAllByUserId(userId);
+            verificationCodeRepository.deleteAllByEmail(email);
+            userRepository.delete(boundUser);
+
+            log.info("Robot #{} and bound user {} deleted successfully", robotId, userId);
+            return ResponseEntity.ok(Map.of("message", "Robot and bound user deleted"));
+        }
+
+        log.info("Robot #{} (unbound) deleted successfully", robotId);
+        return ResponseEntity.ok(Map.of("message", "Robot deleted"));
     }
 
     private LocalDateTime parseDateTime(String value, boolean isEnd) {

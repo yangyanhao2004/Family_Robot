@@ -7,4 +7,5 @@ import java.util.Optional;
 
 public interface SettingsRepository extends JpaRepository<UserSettings, Long> {
     Optional<UserSettings> findByUserId(Long userId);
+    void deleteByUserId(Long userId);
 }

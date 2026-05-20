@@ -15,4 +15,5 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
     List<Reminder> findByUserIdOrderByScheduledTimeDesc(Long userId);
 
     void deleteByScheduledTimeBefore(LocalDateTime cutoff);
+    void deleteAllByUserId(Long userId);
 }

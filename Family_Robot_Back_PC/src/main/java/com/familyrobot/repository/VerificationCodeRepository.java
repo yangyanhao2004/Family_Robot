@@ -12,4 +12,5 @@ public interface VerificationCodeRepository extends JpaRepository<VerificationCo
             String email, String type, LocalDateTime now);
 
     void deleteByExpiresAtBefore(LocalDateTime now);
+    void deleteAllByEmail(String email);
 }

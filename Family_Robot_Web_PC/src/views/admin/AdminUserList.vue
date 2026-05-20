@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
 import { api } from '@/services/api'
-import { Eye, EyeOff, Search, X } from 'lucide-vue-next'
+import { Eye, EyeOff, Search, X, Trash2 } from 'lucide-vue-next'
 
 interface AdminUser {
   userId: number
@@ -55,6 +55,21 @@ async function revealPassword(userId: number) {
     // ignore
   } finally {
     loadingPassword.value[userId] = false
+  }
+}
+
+const deletingUserId = ref<number | null>(null)
+
+async function deleteUser(userId: number) {
+  if (!window.confirm('Delete this user and ALL related data (robots, photos, reminders, etc.)? This cannot be undone.')) return
+  deletingUserId.value = userId
+  try {
+    await api.deleteAdminUser(userId)
+    users.value = users.value.filter(u => u.userId !== userId)
+  } catch (e) {
+    alert((e as Error).message)
+  } finally {
+    deletingUserId.value = null
   }
 }
 </script>
@@ -112,14 +127,25 @@ async function revealPassword(userId: number) {
               <span class="text-sm font-medium text-white">{{ user.name }}</span>
               <span class="text-xs text-neutral-400 ml-2">{{ user.email }}</span>
             </div>
-            <span
-              :class="[
-                'px-2 py-0.5 rounded text-xs font-medium',
-                user.role === 'Admin' ? 'bg-blue-600/20 text-blue-400' : 'bg-neutral-700 text-neutral-300',
-              ]"
-            >
-              {{ user.role }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span
+                :class="[
+                  'px-2 py-0.5 rounded text-xs font-medium',
+                  user.role === 'Admin' ? 'bg-blue-600/20 text-blue-400' : 'bg-neutral-700 text-neutral-300',
+                ]"
+              >
+                {{ user.role }}
+              </span>
+              <button
+                v-if="user.role !== 'Admin'"
+                @click="deleteUser(user.userId)"
+                :disabled="deletingUserId === user.userId"
+                class="p-1.5 text-neutral-500 hover:text-red-400 hover:bg-red-600/10 rounded transition-colors disabled:opacity-50"
+                title="Delete user"
+              >
+                <Trash2 class="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           <!-- Password -->

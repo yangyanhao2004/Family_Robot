@@ -158,4 +158,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ serialNumber }),
     }),
+
+  deleteAdminUser: (userId: number) =>
+    request<{ message: string }>(`/api/admin/users/${userId}`, { method: 'DELETE' }),
+
+  deleteAdminRobot: (robotId: number) =>
+    request<{ message: string }>(`/api/admin/robots/${robotId}`, { method: 'DELETE' }),
 }
