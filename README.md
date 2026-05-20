@@ -72,6 +72,14 @@ mvn spring-boot:run
 | `JWT_SECRET` | 内置默认值 | JWT 签名密钥（生产环境须修改） |
 | `AES_SECRET` | 内置默认值 | 密码加密密钥（生产环境须修改） |
 | `PYTHON_BACKEND_URL` | `http://192.168.137.90:8080` | Python 后端地址（用于发送 VOICE 提醒） |
+| `SMTP_USERNAME` | 无默认值（必填） | QQ 邮箱地址（用于发送验证码和提醒邮件） |
+| `SMTP_PASSWORD` | 无默认值（必填） | QQ 邮箱 SMTP 授权码（**非** QQ 密码） |
+
+> **邮件配置说明**：
+> 1. 复制 `application.yml.example` 为 `application.yml`（`application.yml` 已被 git 忽略，不会泄露）
+> 2. 登录 QQ 邮箱 → 设置 → 账户 → POP3/SMTP 服务 → 开启并获取授权码
+> 3. 将 QQ 邮箱地址和授权码填入 `SMTP_USERNAME` 和 `SMTP_PASSWORD` 环境变量（或直接在 `application.yml` 中修改）
+> 4. 如果不配置邮件，注册时的邮箱验证码功能将不可用
 
 **首次启动后**，系统会通过 `data.sql` 自动创建管理员账号：
 - 邮箱：`admin@familybot.com`

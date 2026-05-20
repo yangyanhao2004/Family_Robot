@@ -72,6 +72,14 @@ mvn spring-boot:run
 | `JWT_SECRET` | Built-in default | JWT signing key (change in production) |
 | `AES_SECRET` | Built-in default | Password encryption key (change in production) |
 | `PYTHON_BACKEND_URL` | `http://192.168.137.90:8080` | Python backend address (for VOICE reminders) |
+| `SMTP_USERNAME` | No default (required) | QQ email address (for verification codes & reminder emails) |
+| `SMTP_PASSWORD` | No default (required) | QQ SMTP authorization code (**not** your QQ password) |
+
+> **Email configuration**:
+> 1. Copy `application.yml.example` to `application.yml` (`application.yml` is git-ignored and won't be leaked)
+> 2. Log in to QQ Mail → Settings → Accounts → POP3/SMTP Service → Enable and generate an authorization code
+> 3. Set `SMTP_USERNAME` and `SMTP_PASSWORD` environment variables (or edit `application.yml` directly)
+> 4. If email is not configured, the verification code feature during registration will be unavailable
 
 **On first startup**, an admin account is auto-created via `data.sql`:
 - Email: `admin@familybot.com`
