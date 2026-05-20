@@ -160,8 +160,13 @@ class KimiK25Client:
         self,
         messages: List[Dict[str, str]],
         tools: Optional[List[Dict]] = None,
+        tool_choice: Optional[str] = None,
     ) -> ChatResponse:
-        """Send multi-turn messages to Kimi K2.5 with optional tools."""
+        """Send multi-turn messages to Kimi K2.5 with optional tools.
+
+        Args:
+            tool_choice: Force a specific function name, or None for auto.
+        """
         payload: Dict[str, Any] = {
             "model": self.MODEL,
             "messages": messages,
@@ -171,7 +176,10 @@ class KimiK25Client:
 
         if tools:
             payload["tools"] = tools
-            payload["tool_choice"] = "auto"
+            if tool_choice:
+                payload["tool_choice"] = {"type": "function", "function": {"name": tool_choice}}
+            else:
+                payload["tool_choice"] = "auto"
 
         response = await self.client.post(
             f"{self.BASE_URL}/chat/completions",
