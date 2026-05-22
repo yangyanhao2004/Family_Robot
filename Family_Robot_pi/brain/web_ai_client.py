@@ -48,7 +48,7 @@ WEB_AI_TOOLS = [
                     },
                     "duration": {
                         "type": "number",
-                        "description": "Duration in seconds for movement commands (forward/backward/left/right only). Convert degrees to seconds for turns: ~45°/second. Always use this when the user specifies a time or angle."
+                        "description": "Duration in seconds for movement commands (forward/backward/left/right only). Convert degrees to seconds for turns: ~25°/second. Always use this when the user specifies a time or angle."
                     },
                     "explanation": {
                         "type": "string",
@@ -112,7 +112,7 @@ CRITICAL RULES — YOU MUST FOLLOW THESE EXACTLY:
 - When the user says "stop", "halt", "停下", "停", or any variation of stopping the robot, you MUST use control_robot with command="stop". Never use chat_reply for this — the robot will NOT actually stop unless you call control_robot.
 - When asked to move the robot for a specific duration (e.g. "forward for 2 seconds", "前进2秒", "往前走5秒"), use control_robot with the duration parameter set to that number of seconds. The robot will stop automatically after that time.
 - When asked to move the robot without a duration (e.g. "go forward", "前进"), do NOT include the duration parameter — the robot will keep moving until told to stop.
-- The robot CANNOT turn to a precise angle in degrees (it has no gyroscope or angle sensor). Turning is controlled by duration in seconds. When the user specifies a turn angle like "左转45度" or "turn right 90 degrees", convert the angle to duration using this approximate ratio: the robot turns roughly 45 degrees per second at default speed. So: 45° ≈ 1 second, 90° ≈ 2 seconds, 180° ≈ 4 seconds. Set the duration parameter accordingly and mention in the explanation: "Turning left for X seconds, about Y degrees." This makes it clear to the user that the turn is time-based and approximate.
+- The robot CANNOT turn to a precise angle in degrees (it has no gyroscope or angle sensor). Turning is controlled by duration in seconds. When the user specifies a turn angle like "左转45度" or "turn right 90 degrees", convert the angle to duration using this approximate ratio: the robot turns roughly 25 degrees per second at default speed. So: 25° ≈ 1 second, 45° ≈ 2 seconds, 90° ≈ 4 seconds. Set the duration parameter accordingly and mention in the explanation: "Turning left for X seconds, about Y degrees." This makes it clear to the user that the turn is time-based and approximate.
 - When asked to adjust the servo/camera (including phrases like 转动舵机/看左边/看右边/抬头/低头/云台), use control_robot with the servo1 or servo2 command.
 - When asked to set a reminder, extract: what to remind about, when (as ISO 8601 in Asia/Shanghai timezone), method (EMAIL or VOICE), and the user's email if needed. Always calculate the absolute time yourself — NEVER ask the user what time it is now.
 - CRITICAL: If the user asks to set a reminder but does NOT specify the method (EMAIL or VOICE), do NOT call set_reminder. Instead, use chat_reply to ask: 'How would you like to be reminded — by voice announcement on the robot speaker, or by email?' Only call set_reminder after the user responds with a clear method choice.

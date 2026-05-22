@@ -89,8 +89,8 @@ class PiWebSocketClient:
             self.controller = controller
         else:
             serial_ctrl = SerialRobotController(
-                forward_speed=_env_float("FAMILY_ROBOT_FORWARD_SPEED", 50.0),
-                turn_speed=_env_float("FAMILY_ROBOT_TURN_SPEED", 30.0),
+                forward_speed=_env_float("FAMILY_ROBOT_FORWARD_SPEED", 30.0),
+                turn_speed=_env_float("FAMILY_ROBOT_TURN_SPEED", 18.0),
             )
             if serial_ctrl.open():
                 self.controller = serial_ctrl

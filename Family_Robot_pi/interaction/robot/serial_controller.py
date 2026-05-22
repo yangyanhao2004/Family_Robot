@@ -118,8 +118,8 @@ class SerialRobotController:
         self,
         port: str | None = None,
         baudrate: int = 115200,
-        forward_speed: float = 50.0,
-        turn_speed: float = 30.0,
+        forward_speed: float = 30.0,
+        turn_speed: float = 18.0,
         timeout: float = 0.1,
     ):
         self._port = port or os.getenv("FAMILY_ROBOT_SERIAL_PORT") or _auto_detect_port()
@@ -239,14 +239,14 @@ class SerialRobotController:
             a = max(0.0, min(180.0, angle))
             self._send_uart(f"S2={a:.0f}\r\n")
         elif command == "speed_low":
-            self._forward_speed = 25.0
-            self._turn_speed = 15.0
+            self._forward_speed = 15.0
+            self._turn_speed = 9.0
         elif command == "speed_medium":
+            self._forward_speed = 30.0
+            self._turn_speed = 18.0
+        elif command == "speed_high":
             self._forward_speed = 50.0
             self._turn_speed = 30.0
-        elif command == "speed_high":
-            self._forward_speed = 80.0
-            self._turn_speed = 50.0
         else:
             return False
 
