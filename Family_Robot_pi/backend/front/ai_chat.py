@@ -37,6 +37,29 @@ _DIRECTION_MAP: Dict[str, str] = {
 
 _STOP_WORDS = {'停', '停下', '停止', '停下来', '停住', '站住', '别动'}
 
+# Chinese numeral → digit mapping for prefilter
+_CN_NUM_MAP = {
+    '一': '1', '二': '2', '三': '3', '四': '4', '五': '5',
+    '六': '6', '七': '7', '八': '8', '九': '9', '十': '10',
+}
+
+# Gaze/view phrases → servo commands (checked BEFORE movement keywords)
+_GAZE_MAP: Dict[str, tuple] = {
+    '向左看': ('servo1', 160), '往左看': ('servo1', 160),
+    '向右看': ('servo1', 20),  '往右看': ('servo1', 20),
+    '向上看': ('servo2', 30),  '往下看': ('servo2', 150),
+    '看左边': ('servo1', 160), '看右边': ('servo1', 20),
+    '看上面': ('servo2', 30),  '看下面': ('servo2', 150),
+    '抬头': ('servo2', 30),    '低头': ('servo2', 150),
+}
+
+def _normalize_chinese_numerals(text: str) -> str:
+    """Replace Chinese numeral characters with ASCII digits for regex matching."""
+    result = text
+    for cn, digit in _CN_NUM_MAP.items():
+        result = result.replace(cn, digit)
+    return result
+
 # Pattern: direction word + number + optional unit
 _RE_DURATION = re.compile(
     r'(' + '|'.join(re.escape(k) for k in _DIRECTION_MAP) + r')\s*(\d+)\s*(秒|s|seconds?)?',
@@ -75,8 +98,19 @@ def _prefilter_command(text: str) -> Optional[Dict[str, Any]]:
             'explanation': '已停止' if _chinese_pattern.search(stripped) else 'Stopped.',
         }
 
-    # 2) Chinese direction + duration
-    m = _RE_DURATION.search(stripped)
+    # 2) Gaze / view commands → servo (before movement keywords)
+    for phrase, (servo_cmd, angle_val) in _GAZE_MAP.items():
+        if phrase in stripped:
+            return {
+                'action': 'control_robot',
+                'command': servo_cmd,
+                'angle': angle_val,
+                'explanation': f'好的，{phrase}',
+            }
+
+    # 3) Chinese direction + duration (normalize Chinese numerals first)
+    normalized = _normalize_chinese_numerals(stripped)
+    m = _RE_DURATION.search(normalized)
     if m:
         cmd = _DIRECTION_MAP[m.group(1)]
         dur = int(m.group(2))
@@ -87,7 +121,7 @@ def _prefilter_command(text: str) -> Optional[Dict[str, Any]]:
             'explanation': f'好的，{m.group(1)}{dur}秒' if _chinese_pattern.search(stripped) else f'{cmd} for {dur}s',
         }
 
-    # 3) Chinese direction only
+    # 4) Chinese direction only
     m = _RE_DIRECTION_ONLY.match(stripped)
     if m:
         cmd = _DIRECTION_MAP[m.group(1)]
@@ -97,7 +131,7 @@ def _prefilter_command(text: str) -> Optional[Dict[str, Any]]:
             'explanation': f'好的，{m.group(1)}',
         }
 
-    # 4) English direction + duration
+    # 5) English direction + duration
     m = _RE_EN_DURATION.search(stripped.lower())
     if m:
         raw_cmd = m.group(1).replace(' ', '_')
@@ -110,7 +144,7 @@ def _prefilter_command(text: str) -> Optional[Dict[str, Any]]:
             'explanation': f'{cmd} for {dur}s',
         }
 
-    # 5) English direction only
+    # 6) English direction only
     if _RE_EN_DIRECTION.match(stripped.lower()):
         raw_cmd = stripped.lower().replace(' ', '_')
         cmd = _normalize_en_direction(raw_cmd)
@@ -120,7 +154,7 @@ def _prefilter_command(text: str) -> Optional[Dict[str, Any]]:
             'explanation': f'{cmd}.',
         }
 
-    # 6) Servo commands
+    # 7) Servo commands
     m = _RE_SERVO.search(stripped)
     if m:
         servo_idx = m.group(1)
@@ -208,23 +242,23 @@ async def handle_ai_chat(message: Dict[str, Any]):
     session = session_manager.get_or_create(int(user_id))
     session.add_message("user", user_text)
 
-    # ---- Scheme A: Pre-filter clear commands, skip AI entirely ----
-    prefilter_result = _prefilter_command(user_text)
-    if prefilter_result is not None:
-        await _execute_control_robot(prefilter_result, session)
-        return
-
-    system_prompt = get_web_ai_system_prompt()
-    if user_email:
-        system_prompt += f"\n\nThe current user's email address is {user_email}. When setting EMAIL reminders for this user, always use this email address. Do NOT ask the user for their email."
-
-    api_messages = [{"role": "system", "content": system_prompt}]
-    api_messages.extend(session.get_messages())
-
-    # ---- Scheme B: Detect tool_choice to force ----
-    forced_tool = _detect_tool_choice(user_text)
-
     try:
+        # ---- Scheme A: Pre-filter clear commands, skip AI entirely ----
+        prefilter_result = _prefilter_command(user_text)
+        if prefilter_result is not None:
+            await _execute_control_robot(prefilter_result, session)
+            return
+
+        system_prompt = get_web_ai_system_prompt()
+        if user_email:
+            system_prompt += f"\n\nThe current user's email address is {user_email}. When setting EMAIL reminders for this user, always use this email address. Do NOT ask the user for their email."
+
+        api_messages = [{"role": "system", "content": system_prompt}]
+        api_messages.extend(session.get_messages())
+
+        # ---- Scheme B: Detect tool_choice to force ----
+        forced_tool = _detect_tool_choice(user_text)
+
         kimi = _get_kimi()
         response = await kimi.chat(api_messages, tools=WEB_AI_TOOLS, tool_choice=forced_tool)
 
@@ -239,7 +273,7 @@ async def handle_ai_chat(message: Dict[str, Any]):
                 "payload": {"text": reply_text, "action": "chat_reply"}
             })
     except Exception as e:
-        logger.error("AI chat error: %s", e)
+        logger.exception("AI chat error")
         if "401" in str(e) or "Unauthorized" in str(e):
             _kimi_client = None
         await manager.send_to_web({
