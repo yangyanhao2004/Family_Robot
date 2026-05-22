@@ -71,6 +71,10 @@ public class ReminderService {
             text = translateToEnglish(text);
         }
 
+        // Send immediately if the scheduled time is already past or very close,
+        // otherwise let the per-minute scheduler pick it up
+        boolean sendNow = !scheduledTime.isAfter(LocalDateTime.now().plusSeconds(10));
+
         Reminder reminder = Reminder.builder()
                 .userId(req.getUserId())
                 .text(text)
@@ -78,13 +82,29 @@ public class ReminderService {
                 .method(req.getMethod())
                 .email(req.getEmail())
                 .enabled(true)
-                .sent(false)
+                .sent(sendNow)
                 .createdAt(LocalDateTime.now())
                 .build();
 
         reminder = reminderRepository.save(reminder);
-        log.info("Reminder #{} created: {} ({}) for user {}", reminder.getId(),
-                reminder.getText(), reminder.getMethod(), reminder.getUserId());
+        log.info("Reminder #{} created: {} ({}) for user {} {}",
+                reminder.getId(), reminder.getText(), reminder.getMethod(),
+                reminder.getUserId(), sendNow ? "[sent immediately]" : "[scheduled]");
+
+        if (sendNow) {
+            try {
+                if ("EMAIL".equals(req.getMethod())) {
+                    sendEmailReminder(reminder);
+                } else if ("VOICE".equals(req.getMethod())) {
+                    sendVoiceReminder(reminder);
+                }
+            } catch (Exception e) {
+                log.error("Immediate send failed for reminder #{}: {}", reminder.getId(), e.getMessage());
+                reminder.setSent(false);
+                reminderRepository.save(reminder);
+            }
+        }
+
         return toDto(reminder);
     }
 

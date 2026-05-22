@@ -320,12 +320,12 @@ async def _store_reminder_in_java(
     user_id: int, text: str, scheduled_time: str, method: str, email: str
 ) -> bool:
     # Compensate for stale system-prompt timestamp + API latency:
-    # ensure scheduled_time is at least 30s in the future, otherwise Java rejects it.
+    # ensure scheduled_time is at least 5s in the future (Java has 60s grace period).
     try:
         tz = datetime.timezone(datetime.timedelta(hours=8))
         now = datetime.datetime.now(tz).replace(tzinfo=None)
         target = datetime.datetime.fromisoformat(scheduled_time)
-        min_future = now + datetime.timedelta(seconds=30)
+        min_future = now + datetime.timedelta(seconds=5)
         if target < min_future:
             logger.warning("scheduled_time %s too close, adjusting to %s", scheduled_time, min_future.isoformat())
             scheduled_time = min_future.strftime("%Y-%m-%dT%H:%M:%S")
