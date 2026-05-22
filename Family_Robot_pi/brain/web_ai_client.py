@@ -63,7 +63,7 @@ WEB_AI_TOOLS = [
         "type": "function",
         "function": {
             "name": "set_reminder",
-            "description": "Create a reminder. Use EMAIL method when the user asks to be reminded via email. Use VOICE method when the user asks to be reminded via the robot's speaker/voice announcement.",
+            "description": "Create a reminder. Use EMAIL method when the user asks to be reminded via email. Use VOICE method when the user asks to be reminded via the robot's speaker/voice/语音 announcement. IMPORTANT: only call this when the user has clearly specified the method (EMAIL or VOICE).",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -114,6 +114,7 @@ CRITICAL RULES — YOU MUST FOLLOW THESE EXACTLY:
 - When asked to move the robot without a duration (e.g. "go forward", "前进"), do NOT include the duration parameter — the robot will keep moving until told to stop.
 - When asked to adjust the servo/camera (including phrases like 转动舵机/看左边/看右边/抬头/低头/云台), use control_robot with the servo1 or servo2 command.
 - When asked to set a reminder, extract: what to remind about, when (as ISO 8601 in Asia/Shanghai timezone), method (EMAIL or VOICE), and the user's email if needed. Always calculate the absolute time yourself — NEVER ask the user what time it is now.
+- CRITICAL: If the user asks to set a reminder but does NOT specify the method (EMAIL or VOICE), do NOT call set_reminder. Instead, use chat_reply to ask: 'How would you like to be reminded — by voice announcement on the robot speaker, or by email?' Only call set_reminder after the user responds with a clear method choice.
 - For servo commands: servo1 = horizontal pan (0=far right, 180=far left, 90=center). servo2 = vertical tilt (0=tilt all the way UP, 180=tilt all the way DOWN, 90=center/level). So "look left" means servo1 angle > 90, "look right" means servo1 angle < 90. "tilt up 30 degrees" means servo2 angle=60, "tilt down 20 degrees" means servo2 angle=110.
 - Keep responses concise and friendly. Use the same language as the user.
 - If the user says something ambiguous, ask clarifying questions via chat_reply.

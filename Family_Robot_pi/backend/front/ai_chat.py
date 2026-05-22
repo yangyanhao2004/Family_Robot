@@ -160,6 +160,14 @@ _REMINDER_KEYWORDS = [
     '提醒', 'remind', '通知', 'notify', '闹钟', 'alarm', '定时',
 ]
 
+_METHOD_VOICE_KEYWORDS = [
+    '语音', 'voice', '播报', '说话', '扬声器', '喇叭', 'speaker',
+]
+
+_METHOD_EMAIL_KEYWORDS = [
+    '邮件', 'email', '邮箱', '发邮件', 'mail',
+]
+
 
 def _detect_tool_choice(text: str) -> Optional[str]:
     """Detect which tool to force based on keywords. Returns None for auto."""
@@ -169,7 +177,11 @@ def _detect_tool_choice(text: str) -> Optional[str]:
             return 'control_robot'
     for kw in _REMINDER_KEYWORDS:
         if kw in lower:
-            return 'set_reminder'
+            has_voice = any(kw in lower for kw in _METHOD_VOICE_KEYWORDS)
+            has_email = any(kw in lower for kw in _METHOD_EMAIL_KEYWORDS)
+            if has_voice or has_email:
+                return 'set_reminder'
+            return None
     return None
 
 
@@ -307,21 +319,18 @@ async def _execute_tool_call(tc, session, user_id: int):
 async def _store_reminder_in_java(
     user_id: int, text: str, scheduled_time: str, method: str, email: str
 ) -> bool:
-    # Pre-translate Chinese VOICE reminders so no delay at trigger time
-    stored_text = text
-    if method == "VOICE" and _chinese_pattern.search(text):
-        try:
-            kimi = _get_kimi()
-            msgs = [
-                {"role": "system", "content": "You are a translator. Translate the following Chinese text to English. Output ONLY the English translation, nothing else. Keep it concise and natural."},
-                {"role": "user", "content": text},
-            ]
-            resp = await kimi.chat(msgs)
-            if resp.content:
-                stored_text = resp.content.strip()
-                logger.info("Pre-translated VOICE reminder: '%s' -> '%s'", text, stored_text)
-        except Exception as e:
-            logger.error("Pre-translation failed, using original text: %s", e)
+    # Compensate for stale system-prompt timestamp + API latency:
+    # ensure scheduled_time is at least 30s in the future, otherwise Java rejects it.
+    try:
+        tz = datetime.timezone(datetime.timedelta(hours=8))
+        now = datetime.datetime.now(tz).replace(tzinfo=None)
+        target = datetime.datetime.fromisoformat(scheduled_time)
+        min_future = now + datetime.timedelta(seconds=30)
+        if target < min_future:
+            logger.warning("scheduled_time %s too close, adjusting to %s", scheduled_time, min_future.isoformat())
+            scheduled_time = min_future.strftime("%Y-%m-%dT%H:%M:%S")
+    except Exception:
+        pass
 
     java_url = os.getenv("JAVA_BACKEND_URL", "http://localhost:8090")
     try:
@@ -330,7 +339,7 @@ async def _store_reminder_in_java(
                 f"{java_url}/api/reminders",
                 json={
                     "userId": user_id,
-                    "text": stored_text,
+                    "text": text,
                     "scheduledTime": scheduled_time,
                     "method": method,
                     "email": email,

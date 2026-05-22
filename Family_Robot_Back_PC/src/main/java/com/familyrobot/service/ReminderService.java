@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.net.URI;
@@ -24,6 +25,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,6 +35,11 @@ public class ReminderService {
     private final ReminderRepository reminderRepository;
     private final EmailService emailService;
     private final String pythonBackendUrl;
+
+    @Value("${app.moonshot-api-key:}")
+    private String moonshotApiKey;
+
+    private static final Pattern CHINESE_PATTERN = Pattern.compile("[\\u4e00-\\u9fff]");
 
     public ReminderService(ReminderRepository reminderRepository,
                            EmailService emailService,
@@ -54,13 +61,19 @@ public class ReminderService {
         }
 
         LocalDateTime scheduledTime = parseReminderDateTime(req.getScheduledTime());
-        if (!scheduledTime.isAfter(LocalDateTime.now())) {
+        if (scheduledTime.isBefore(LocalDateTime.now().minusSeconds(60))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "scheduledTime must be in the future");
+        }
+
+        // Translate Chinese VOICE reminders to English for Piper TTS compatibility
+        String text = req.getText();
+        if ("VOICE".equals(req.getMethod()) && CHINESE_PATTERN.matcher(text).find()) {
+            text = translateToEnglish(text);
         }
 
         Reminder reminder = Reminder.builder()
                 .userId(req.getUserId())
-                .text(req.getText())
+                .text(text)
                 .scheduledTime(scheduledTime)
                 .method(req.getMethod())
                 .email(req.getEmail())
@@ -183,6 +196,52 @@ public class ReminderService {
             dt = dt + ":00";
         }
         return LocalDateTime.parse(dt, DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"));
+    }
+
+    private String translateToEnglish(String chineseText) {
+        if (moonshotApiKey == null || moonshotApiKey.isBlank()) {
+            log.warn("Moonshot API key not configured, storing original text for VOICE reminder");
+            return chineseText;
+        }
+        try {
+            ObjectNode body = objectMapper.createObjectNode();
+            body.put("model", "moonshot-v1-8k");
+            body.put("temperature", 0.3);
+
+            var messages = body.putArray("messages");
+            var sysMsg = messages.addObject();
+            sysMsg.put("role", "system");
+            sysMsg.put("content", "You are a translator. Translate the following Chinese text to English. "
+                    + "Output ONLY the English translation, nothing else. Keep it concise and natural.");
+            var userMsg = messages.addObject();
+            userMsg.put("role", "user");
+            userMsg.put("content", chineseText);
+
+            String jsonBody = objectMapper.writeValueAsString(body);
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.moonshot.cn/v1/chat/completions"))
+                    .header("Content-Type", "application/json; charset=utf-8")
+                    .header("Authorization", "Bearer " + moonshotApiKey)
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                    .timeout(Duration.ofSeconds(10))
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                JsonNode root = objectMapper.readTree(response.body());
+                String translated = root.path("choices").get(0).path("message").path("content").asText().trim();
+                log.info("Translated VOICE reminder: '{}' -> '{}'", chineseText, translated);
+                return translated;
+            } else {
+                log.error("Kimi translation API returned HTTP {}", response.statusCode());
+                return chineseText;
+            }
+        } catch (Exception e) {
+            log.error("Translation failed, using original text: {}", e.getMessage());
+            return chineseText;
+        }
     }
 
     @Scheduled(cron = "0 0 4 * * *")

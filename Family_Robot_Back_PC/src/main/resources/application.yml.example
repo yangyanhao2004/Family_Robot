@@ -64,6 +64,7 @@ app:
   aes:
     secret-key: ${AES_SECRET:family-robot-aes-secret-key-change-in-production-256bits}
   python-backend-url: ${PYTHON_BACKEND_URL:http://192.168.137.90:8080}
+  moonshot-api-key: ${MOONSHOT_API_KEY:}
 
 logging:
   level:
