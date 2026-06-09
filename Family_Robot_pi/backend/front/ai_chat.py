@@ -261,6 +261,12 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
     # Parse [CMD:...] tags — support multi-step sequences
     cmd_matches = list(re.finditer(r'\[CMD:(forward|backward|left|right|stop|servo1|servo2)\]', reply_text))
     if cmd_matches:
+        logger.info(f"Parsed {len(cmd_matches)} CMD tags: {[m.group(1) for m in cmd_matches]}")
+        # Set medium speed before AI-commanded moves (avoids full-speed dashes)
+        await manager.send_to_pi({
+            "type": "command",
+            "payload": {"command": "speed_medium"}
+        })
         for idx, m in enumerate(cmd_matches):
             cmd_start = m.end()
             next_start = cmd_matches[idx + 1].start() if idx + 1 < len(cmd_matches) else len(reply_text)
@@ -276,6 +282,13 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
             ang_match = re.search(r'\[ANG:(\d+(?:\.\d+)?)\]', cmd_segment)
             if ang_match:
                 args["angle"] = float(ang_match.group(1))
+
+            spd_match = re.search(r'\[SPD:(low|medium|high)\]', cmd_segment)
+            if spd_match:
+                await manager.send_to_pi({
+                    "type": "command",
+                    "payload": {"command": "speed_" + spd_match.group(1)}
+                })
 
             await _execute_control_robot(args, session)
         return ("control_robot", None)

@@ -109,9 +109,9 @@ For casual chat: just reply naturally, no special tags.
 
 For actions, put tag lines in your response. For multi-step sequences, use one tag PER line in order:
 
-[CMD:forward|backward|left|right|stop|servo1|servo2] [DUR:seconds] [ANG:degrees]
-  DUR is optional (omit for continuous movement). ANG only for servos.
-  Turn angles: ~25°/second. 45° ≈ [DUR:2], 90° ≈ [DUR:4]
+[CMD:forward|backward|left|right|stop|servo1|servo2] [DUR:seconds] [ANG:degrees] [SPD:low|medium|high]
+  DUR is optional (omit for continuous movement). Default speed is medium.
+  ANG only for servos. Turn angles: ~25°/second. 45° ≈ [DUR:2], 90° ≈ [DUR:4]
   servo1=horizontal(0=right,90=center,180=left) servo2=vertical(0=up,90=level,180=down)
 
 [REMIND:text] [TIME:2026-06-09T21:30:00] [METHOD:VOICE|EMAIL]
