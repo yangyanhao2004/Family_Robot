@@ -115,7 +115,8 @@ First reply naturally, then put action tags BELOW. Use one line per tag:
   servo1=horizontal(0=right,90=center,180=left) servo2=vertical(0=up,90=level,180=down)
 
 [REMIND:text] [TIME:2026-06-09T21:30:00] [METHOD:VOICE|EMAIL]
-  If method not specified, ask user first.
+  CRITICAL: If user did NOT say "voice/语音" or "email/邮件", do NOT output [REMIND].
+  Instead, reply: "要语音提醒还是邮件提醒？" Wait for their choice.
 
 [WEATHER:city-name]
   e.g. [WEATHER:Beijing] or [WEATHER:London]
@@ -140,7 +141,8 @@ Reply:
 - Be concise, friendly, same language as user.
 - Reply text FIRST (above tags), tags BELOW, one per line.
 - Parse relative times yourself using current time {now}.
-- Only use listed commands. Never make up commands."""
+- Only use listed commands. Never make up commands.
+- FOR REMINDERS: user MUST explicitly say 语音/voice or 邮件/email. Otherwise just chat-ask them, no [REMIND] tag."""
 
 
 @dataclass

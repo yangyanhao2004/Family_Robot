@@ -296,7 +296,7 @@ def _get_kimi() -> 'KimiClient':
     return _kimi_client
 
 
-async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
+async def _parse_and_execute_tags(reply_text: str, user_id: int, user_email: str = "") -> tuple:
     """Parse action tags in AI response. Returns (action, result_text_or_None)."""
     session = session_manager.get_or_create(user_id)
 
@@ -372,16 +372,14 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
             "text": text,
             "scheduledTime": scheduled_time,
             "method": method,
-            "email": "",
+            "email": user_email if method == "EMAIL" else "",
             "enabled": True
         }
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                await client.post(
-                    f"{java_url}/api/reminders",
-                    json=payload
-                )
-                logger.info(f"Reminder created via AI chat: {text} at {scheduled_time}")
+                resp = await client.post(f"{java_url}/api/reminders", json=payload)
+                logger.info(f"Reminder API: {resp.status_code} — {text} at {scheduled_time} ({method})")
+                resp.raise_for_status()
         except Exception as e:
             logger.error(f"Failed to create reminder: {e}")
         return ("set_reminder", None)
@@ -471,7 +469,7 @@ async def handle_ai_chat(message: Dict[str, Any]):
             reply_text = "Sorry, I didn't understand."
 
         # Parse and execute action tags in AI response
-        action, tool_result = await _parse_and_execute_tags(reply_text, int(user_id))
+        action, tool_result = await _parse_and_execute_tags(reply_text, int(user_id), user_email)
 
         # Strip raw tag lines from displayed text (handle both spaced and concatenated)
         clean_text = re.sub(r'\[CMD:[^\]]+\]', '', reply_text)
