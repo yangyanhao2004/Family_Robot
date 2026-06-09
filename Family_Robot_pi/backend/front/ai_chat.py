@@ -17,8 +17,35 @@ from backend.core.connection_manager import manager
 from brain.web_ai_client import WEB_AI_TOOLS, get_web_ai_system_prompt
 from brain.cloud_client import KimiClient
 from brain.session_manager import session_manager
+from brain.tools.weather_tool import WeatherTool
+from brain.tools.news_tool import NewsTool
+from brain.tools.joke_tool import get_joke
 
 logger = logging.getLogger("backend.front.ai_chat")
+
+_weather_tool: Optional[WeatherTool] = None
+_news_tool: Optional[NewsTool] = None
+
+def _get_weather() -> WeatherTool:
+    global _weather_tool
+    if _weather_tool is None:
+        _weather_tool = WeatherTool()
+    return _weather_tool
+
+def _get_news() -> NewsTool:
+    global _news_tool
+    if _news_tool is None:
+        _news_tool = NewsTool()
+    return _news_tool
+
+# Weather-related keywords for detection
+_WEATHER_KW = re.compile(r'天气|weather|气温|温度|下雨|下雪|刮风|晴朗|几度|冷不冷|热不热|凉快|暖和')
+
+# News-related keywords
+_NEWS_KW = re.compile(r'新闻|news|头条|大事|发生什么|最新消息')
+
+# Joke-related keywords
+_JOKE_KW = re.compile(r'笑话|joke|讲个故事|段子|幽默|搞笑')
 
 _kimi_client: Optional[KimiClient] = None
 _chinese_pattern = re.compile(r'[一-鿿]')
@@ -302,6 +329,45 @@ async def handle_ai_chat(message: Dict[str, Any]):
         if prefilter_result is not None:
             await _execute_control_robot(prefilter_result, session)
             return
+
+        # ---- Scheme A-weather: Direct weather query ----
+        if _WEATHER_KW.search(user_text):
+            try:
+                info: str = _get_weather().get_weather("")
+                session.add_message("assistant", info)
+                await manager.send_to_web({
+                    "type": "ai_chat_response",
+                    "payload": {"text": info, "action": "chat_reply"}
+                })
+                return
+            except Exception:
+                pass  # Fall through to AI
+
+        # ---- Scheme A-news: Direct news query ----
+        if _NEWS_KW.search(user_text):
+            try:
+                info = _get_news().get_news("")
+                session.add_message("assistant", info)
+                await manager.send_to_web({
+                    "type": "ai_chat_response",
+                    "payload": {"text": info, "action": "chat_reply"}
+                })
+                return
+            except Exception:
+                pass
+
+        # ---- Scheme A-joke: Direct joke query ----
+        if _JOKE_KW.search(user_text):
+            try:
+                info = get_joke()
+                session.add_message("assistant", info)
+                await manager.send_to_web({
+                    "type": "ai_chat_response",
+                    "payload": {"text": info, "action": "chat_reply"}
+                })
+                return
+            except Exception:
+                pass
 
         system_prompt = get_web_ai_system_prompt()
         if user_email:
