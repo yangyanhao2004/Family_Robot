@@ -329,9 +329,16 @@ async def handle_ai_chat(message: Dict[str, Any]):
         logger.exception("AI chat error")
         if "401" in str(e) or "Unauthorized" in str(e):
             _kimi_client = None
+        # Return a user-friendly error with the original message for retry
+        error_text = f"⚠️ 回复失败，请点击重发\n（{str(e)[:80]}）"
         await manager.send_to_web({
             "type": "ai_chat_response",
-            "payload": {"text": "Sorry, I encountered an error. Please try again.", "action": "chat_reply"}
+            "payload": {
+                "text": error_text,
+                "action": "chat_reply",
+                "error": True,
+                "originalMessage": user_text
+            }
         })
 
 

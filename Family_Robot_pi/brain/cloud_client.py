@@ -53,28 +53,15 @@ class KimiClient:
         return self.chat_messages(messages)
 
     def chat_messages(self, messages: list) -> str:
-        """Send multi-turn messages to Kimi with retry on rate limit."""
-        import time
-
+        """Send multi-turn messages to Kimi and return the response."""
         payload = {
             "model": "moonshot-v1-8k",
             "messages": messages,
             "stream": False
         }
-
-        max_retries = 3
-        for attempt in range(max_retries):
-            response = self.client.post(
-                f"{self.BASE_URL}/chat/completions",
-                json=payload
-            )
-            if response.status_code == 429:
-                wait = (attempt + 1) * 5  # 5s, 10s, 15s
-                print(f"[Kimi] Rate limited, retrying in {wait}s (attempt {attempt + 1}/{max_retries})...")
-                time.sleep(wait)
-                continue
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
-
+        response = self.client.post(
+            f"{self.BASE_URL}/chat/completions",
+            json=payload
+        )
         response.raise_for_status()
-        return ""  # unreachable
+        return response.json()["choices"][0]["message"]["content"]
