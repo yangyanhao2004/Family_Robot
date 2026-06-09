@@ -485,14 +485,11 @@ async def _execute_control_robot(args: Dict[str, Any], session):
     })
 
     if duration and isinstance(duration, (int, float)) and duration > 0 and command != "stop":
-        async def _auto_stop(delay: float):
-            await asyncio.sleep(delay)
-            await manager.send_to_pi({
-                "type": "command",
-                "payload": {"command": "stop"}
-            })
-
-        asyncio.create_task(_auto_stop(float(duration)))
+        await asyncio.sleep(float(duration))
+        await manager.send_to_pi({
+            "type": "command",
+            "payload": {"command": "stop"}
+        })
 
     session.add_message("assistant", explanation)
     await manager.send_to_web({
