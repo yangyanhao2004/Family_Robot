@@ -3,7 +3,7 @@ import logging
 import os
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -75,6 +75,16 @@ async def _websocket_entrypoint(websocket: WebSocket):
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):
     await _websocket_entrypoint(websocket)
+
+
+@app.get("/video/frame")
+async def video_frame():
+    """返回最新的单帧 JPEG 快照，供鸿蒙等不支持 MJPEG 流的客户端轮询"""
+    jpeg_bytes = video_hub.latest_frame
+    if jpeg_bytes is None:
+        return Response(content=b"", media_type="image/jpeg", status_code=204)
+    return Response(content=jpeg_bytes, media_type="image/jpeg",
+                    headers={"Cache-Control": "no-cache", "Pragma": "no-cache"})
 
 
 @app.get("/video/stream")
