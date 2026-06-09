@@ -256,11 +256,9 @@ async def handle_ai_chat(message: Dict[str, Any]):
         api_messages = [{"role": "system", "content": system_prompt}]
         api_messages.extend(session.get_messages())
 
-        # ---- Scheme B: Detect tool_choice to force ----
-        forced_tool = _detect_tool_choice(user_text)
-
+        # ---- Scheme B: Call AI with auto tool choice ----
         kimi = _get_kimi()
-        response = await kimi.chat(api_messages, tools=WEB_AI_TOOLS, tool_choice=forced_tool)
+        response = await kimi.chat(api_messages, tools=WEB_AI_TOOLS)
 
         if response.is_tool_call:
             for tc in response.tool_calls:
