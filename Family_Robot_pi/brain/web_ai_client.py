@@ -158,6 +158,22 @@ class KimiK25Client:
             }
         )
 
+    async def chat_text(self, messages: List[Dict[str, str]]) -> str:
+        """Send messages to Kimi and return plain text response (no tools)."""
+        payload: Dict[str, Any] = {
+            "model": self.MODEL,
+            "messages": messages,
+            "stream": False,
+            "temperature": 0.7,
+        }
+        response = await self.client.post(
+            f"{self.BASE_URL}/chat/completions",
+            json=payload
+        )
+        response.raise_for_status()
+        body = response.json()
+        return body["choices"][0]["message"].get("content", "")
+
     async def chat(
         self,
         messages: List[Dict[str, str]],

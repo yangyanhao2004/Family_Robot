@@ -256,20 +256,18 @@ async def handle_ai_chat(message: Dict[str, Any]):
         api_messages = [{"role": "system", "content": system_prompt}]
         api_messages.extend(session.get_messages())
 
-        # ---- Scheme B: Call AI with auto tool choice ----
+        # ---- Scheme B: Plain text chat (moonshot-v1-8k does not support tools) ----
         kimi = _get_kimi()
-        response = await kimi.chat(api_messages, tools=WEB_AI_TOOLS)
+        reply_text = await kimi.chat_text(api_messages)
 
-        if response.is_tool_call:
-            for tc in response.tool_calls:
-                await _execute_tool_call(tc, session, int(user_id))
-        else:
-            reply_text = response.content or "Sorry, I didn't understand."
-            session.add_message("assistant", reply_text)
-            await manager.send_to_web({
-                "type": "ai_chat_response",
-                "payload": {"text": reply_text, "action": "chat_reply"}
-            })
+        if not reply_text:
+            reply_text = "Sorry, I didn't understand."
+
+        session.add_message("assistant", reply_text)
+        await manager.send_to_web({
+            "type": "ai_chat_response",
+            "payload": {"text": reply_text, "action": "chat_reply"}
+        })
     except Exception as e:
         logger.exception("AI chat error")
         if "401" in str(e) or "Unauthorized" in str(e):
