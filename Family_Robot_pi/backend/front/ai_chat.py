@@ -258,21 +258,26 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
     """Parse action tags in AI response. Returns (action, result_text_or_None)."""
     session = session_manager.get_or_create(user_id)
 
-    # Parse [CMD:forward|backward|left|right|stop|servo1|servo2] [DUR:seconds] [ANG:degrees]
-    cmd_match = re.search(r'\[CMD:(forward|backward|left|right|stop|servo1|servo2)\]', reply_text)
-    if cmd_match:
-        command = cmd_match.group(1)
-        args: Dict[str, Any] = {"command": command}
+    # Parse [CMD:...] tags — support multi-step sequences
+    cmd_matches = list(re.finditer(r'\[CMD:(forward|backward|left|right|stop|servo1|servo2)\]', reply_text))
+    if cmd_matches:
+        for idx, m in enumerate(cmd_matches):
+            cmd_start = m.end()
+            next_start = cmd_matches[idx + 1].start() if idx + 1 < len(cmd_matches) else len(reply_text)
+            cmd_segment = reply_text[cmd_start:next_start]
 
-        dur_match = re.search(r'\[DUR:(\d+(?:\.\d+)?)\]', reply_text)
-        if dur_match:
-            args["duration"] = float(dur_match.group(1))
+            command = m.group(1)
+            args: Dict[str, Any] = {"command": command}
 
-        ang_match = re.search(r'\[ANG:(\d+(?:\.\d+)?)\]', reply_text)
-        if ang_match:
-            args["angle"] = float(ang_match.group(1))
+            dur_match = re.search(r'\[DUR:(\d+(?:\.\d+)?)\]', cmd_segment)
+            if dur_match:
+                args["duration"] = float(dur_match.group(1))
 
-        await _execute_control_robot(args, session)
+            ang_match = re.search(r'\[ANG:(\d+(?:\.\d+)?)\]', cmd_segment)
+            if ang_match:
+                args["angle"] = float(ang_match.group(1))
+
+            await _execute_control_robot(args, session)
         return ("control_robot", None)
 
     # Parse [WEATHER:city] — call tool and return result

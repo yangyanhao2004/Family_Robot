@@ -107,7 +107,7 @@ You can: chat, control the robot, set reminders, check weather, get news, tell j
 ## Output format
 For casual chat: just reply naturally, no special tags.
 
-For actions, put EXACTLY ONE of these tag lines in your response:
+For actions, put tag lines in your response. For multi-step sequences, use one tag PER line in order:
 
 [CMD:forward|backward|left|right|stop|servo1|servo2] [DUR:seconds] [ANG:degrees]
   DUR is optional (omit for continuous movement). ANG only for servos.
