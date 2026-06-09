@@ -220,29 +220,6 @@ def _detect_tool_choice(text: str) -> Optional[str]:
     return None
 
 
-# Quick canned responses for common questions to save API quota
-_CANNED_RESPONSES: Dict[str, str] = {
-    "你好": "你好！我是 Jarvis，你的家庭服务机器人助手。有什么我可以帮你的吗？",
-    "hi": "Hi! I'm Jarvis, your home robot assistant. How can I help you?",
-    "hello": "Hello! I'm Jarvis at your service. What can I do for you?",
-    "你是谁": "我是 Jarvis，你的AI家庭机器人助手。我可以帮你控制机器人移动、设置提醒，还能陪你聊天！",
-    "who are you": "I'm Jarvis, your AI home robot assistant. I can control the robot, set reminders, and chat with you!",
-    "你能做什么": "我可以：1) 控制机器人移动（前进/后退/左转/右转/停止）2) 调整摄像头云台角度 3) 设置语音或邮件提醒 4) 陪你聊天。告诉我你需要什么吧！",
-    "what can you do": "I can: 1) Control robot movement 2) Adjust camera servos 3) Set voice/email reminders 4) Chat with you. What would you like?",
-    "谢谢": "不客气！随时为你服务。",
-    "thanks": "You're welcome! I'm here to help anytime.",
-    "thank you": "You're welcome! Anything else I can help with?",
-}
-
-def _get_canned_response(user_text: str) -> Optional[str]:
-    """Return pre-canned response for common simple questions, or None."""
-    clean = user_text.strip().lower().rstrip('!！。.?？')
-    for key, value in _CANNED_RESPONSES.items():
-        if clean == key or clean.startswith(key):
-            return value
-    return None
-
-
 def _get_kimi() -> 'KimiClient':
     global _kimi_client
     if _kimi_client is None:
@@ -324,16 +301,6 @@ async def handle_ai_chat(message: Dict[str, Any]):
         prefilter_result = _prefilter_command(user_text)
         if prefilter_result is not None:
             await _execute_control_robot(prefilter_result, session)
-            return
-
-        # ---- Scheme A2: Pre-canned responses for common questions (save API quota) ----
-        canned = _get_canned_response(user_text)
-        if canned is not None:
-            session.add_message("assistant", canned)
-            await manager.send_to_web({
-                "type": "ai_chat_response",
-                "payload": {"text": canned, "action": "chat_reply"}
-            })
             return
 
         system_prompt = get_web_ai_system_prompt()
