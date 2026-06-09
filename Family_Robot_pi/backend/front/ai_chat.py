@@ -50,6 +50,48 @@ _JOKE_KW = re.compile(r'笑话|joke|讲个故事|段子|幽默|搞笑')
 _kimi_client: Optional[KimiClient] = None
 _chinese_pattern = re.compile(r'[一-鿿]')
 
+# ---- Command Queue: sequential execution with duration waits ----
+_cmd_queue: 'asyncio.Queue' = asyncio.Queue(maxsize=100)
+_cmd_worker_started: bool = False
+
+
+async def _cmd_queue_worker():
+    """Background worker: processes commands one at a time."""
+    logger.info("Command queue worker started")
+    while True:
+        args: Dict[str, Any] = await _cmd_queue.get()
+        try:
+            command = args.get("command", "stop")
+            angle = args.get("angle", 90)
+            duration = args.get("duration")
+            if command not in VALID_COMMANDS and not command.startswith("speed_"):
+                command = "stop"
+            await manager.send_to_pi({
+                "type": "command", "payload": {"command": command, "angle": angle}
+            })
+            if duration and isinstance(duration, (int, float)) and duration > 0 and command not in ("stop",):
+                await asyncio.sleep(float(duration))
+                await manager.send_to_pi({
+                    "type": "command", "payload": {"command": "stop"}
+                })
+        except Exception as e:
+            logger.error(f"Command queue error: {e}")
+        finally:
+            _cmd_queue.task_done()
+
+
+def _ensure_worker():
+    global _cmd_worker_started
+    if not _cmd_worker_started:
+        _cmd_worker_started = True
+        asyncio.create_task(_cmd_queue_worker())
+
+
+async def _enqueue_command(args: Dict[str, Any]):
+    _ensure_worker()
+    await _cmd_queue.put(args)
+
+
 VALID_COMMANDS = {"forward", "backward", "left", "right", "stop", "servo1", "servo2"}
 
 # ---- Pre-filter: direct command interception (Scheme A) ----
@@ -262,11 +304,8 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
     cmd_matches = list(re.finditer(r'\[CMD:(forward|backward|left|right|stop|servo1|servo2)\]', reply_text))
     if cmd_matches:
         logger.info(f"Parsed {len(cmd_matches)} CMD tags: {[m.group(1) for m in cmd_matches]}")
-        # Set medium speed before AI-commanded moves (avoids full-speed dashes)
-        await manager.send_to_pi({
-            "type": "command",
-            "payload": {"command": "speed_medium"}
-        })
+        # Set medium speed before AI-commanded moves
+        await _enqueue_command({"command": "speed_medium", "angle": 90})
         for idx, m in enumerate(cmd_matches):
             cmd_start = m.end()
             next_start = cmd_matches[idx + 1].start() if idx + 1 < len(cmd_matches) else len(reply_text)
@@ -285,10 +324,7 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
 
             spd_match = re.search(r'\[SPD:(low|medium|high)\]', cmd_segment)
             if spd_match:
-                await manager.send_to_pi({
-                    "type": "command",
-                    "payload": {"command": "speed_" + spd_match.group(1)}
-                })
+                await _enqueue_command({"command": "speed_" + spd_match.group(1), "angle": 90})
 
             await _execute_control_robot(args, session)
         return ("control_robot", None)
@@ -470,25 +506,21 @@ async def handle_ai_chat(message: Dict[str, Any]):
 
 
 async def _execute_control_robot(args: Dict[str, Any], session):
-    """Execute a robot control command and send responses. Shared by prefilter and AI tool-call paths."""
+    """Enqueue a command and respond. Queue ensures sequential execution."""
     command = args.get("command", "stop")
-    angle = args.get("angle", 90)
-    duration = args.get("duration")
     explanation = args.get("explanation", f"Executing {command}")
 
-    if command not in VALID_COMMANDS:
-        command = "stop"
-
-    await manager.send_to_pi({
-        "type": "command",
-        "payload": {"command": command, "angle": angle}
-    })
-
-    if duration and isinstance(duration, (int, float)) and duration > 0 and command != "stop":
-        await asyncio.sleep(float(duration))
+    if command.startswith("speed_"):
+        # Speed commands take effect immediately, no stop
         await manager.send_to_pi({
-            "type": "command",
-            "payload": {"command": "stop"}
+            "type": "command", "payload": {"command": command}
+        })
+
+    elif command in VALID_COMMANDS:
+        await _enqueue_command({
+            "command": command,
+            "angle": args.get("angle", 90),
+            "duration": args.get("duration")
         })
 
     session.add_message("assistant", explanation)
@@ -497,7 +529,7 @@ async def _execute_control_robot(args: Dict[str, Any], session):
         "payload": {
             "text": explanation,
             "action": "control_robot",
-            "data": {"command": command, "angle": angle}
+            "data": {"command": command}
         }
     })
 
