@@ -372,7 +372,12 @@ async def handle_ai_chat(message: Dict[str, Any]):
 
     try:
         # ---- Scheme A: Pre-filter clear commands, skip AI entirely ----
-        prefilter_result = _prefilter_command(user_text)
+        # Skip prefilter for multi-step sequences (then/然后/接着/再) — let AI handle them
+        multi_step_kw = re.search(r'然后|接着|之后|再|then|after|and then', user_text, re.IGNORECASE)
+        if not multi_step_kw:
+            prefilter_result = _prefilter_command(user_text)
+        else:
+            prefilter_result = None
         if prefilter_result is not None:
             await _execute_control_robot(prefilter_result, session)
             return
