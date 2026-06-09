@@ -14,12 +14,13 @@ from typing import Dict, Any, Optional
 import httpx
 
 from backend.core.connection_manager import manager
-from brain.web_ai_client import KimiK25Client, WEB_AI_TOOLS, get_web_ai_system_prompt
+from brain.web_ai_client import WEB_AI_TOOLS, get_web_ai_system_prompt
+from brain.cloud_client import KimiClient
 from brain.session_manager import session_manager
 
 logger = logging.getLogger("backend.front.ai_chat")
 
-_kimi_client: Optional[KimiK25Client] = None
+_kimi_client: Optional[KimiClient] = None
 _chinese_pattern = re.compile(r'[一-鿿]')
 
 VALID_COMMANDS = {"forward", "backward", "left", "right", "stop", "servo1", "servo2"}
@@ -219,10 +220,10 @@ def _detect_tool_choice(text: str) -> Optional[str]:
     return None
 
 
-def _get_kimi() -> KimiK25Client:
+def _get_kimi() -> 'KimiClient':
     global _kimi_client
     if _kimi_client is None:
-        _kimi_client = KimiK25Client()
+        _kimi_client = KimiClient()  # type: ignore[assignment]
     return _kimi_client
 
 
@@ -258,7 +259,7 @@ async def handle_ai_chat(message: Dict[str, Any]):
 
         # ---- Scheme B: Plain text chat (moonshot-v1-8k does not support tools) ----
         kimi = _get_kimi()
-        reply_text = await kimi.chat_text(api_messages)
+        reply_text = kimi.chat_messages(api_messages)
 
         if not reply_text:
             reply_text = "Sorry, I didn't understand."
