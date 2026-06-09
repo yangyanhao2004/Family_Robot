@@ -254,9 +254,9 @@ def _get_kimi() -> 'KimiClient':
     return _kimi_client
 
 
-async def _parse_and_execute_tags(reply_text: str, user_id: int) -> str:
-    """Parse [CMD:...] and [REMIND:...] tags in AI response and execute."""
-    action = "chat_reply"
+async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
+    """Parse action tags in AI response. Returns (action, result_text_or_None)."""
+    session = session_manager.get_or_create(user_id)
 
     # Parse [CMD:forward|backward|left|right|stop|servo1|servo2] [DUR:seconds] [ANG:degrees]
     cmd_match = re.search(r'\[CMD:(forward|backward|left|right|stop|servo1|servo2)\]', reply_text)
@@ -272,10 +272,40 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> str:
         if ang_match:
             args["angle"] = float(ang_match.group(1))
 
-        session = session_manager.get_or_create(user_id)
         await _execute_control_robot(args, session)
-        action = "control_robot"
-        return action
+        return ("control_robot", None)
+
+    # Parse [WEATHER:city] — call tool and return result
+    weather_match = re.search(r'\[WEATHER:([^\]]+)\]', reply_text)
+    if weather_match:
+        city = weather_match.group(1).strip()
+        try:
+            info = _get_weather().get_weather(city)
+            session.add_message("assistant", info)
+            return ("chat_reply", info)
+        except Exception as e:
+            logger.error(f"Weather tool error: {e}")
+            return ("chat_reply", f"Sorry, couldn't get weather for {city}.")
+
+    # Parse [NEWS]
+    if re.search(r'\[NEWS\]', reply_text):
+        try:
+            info = _get_news().get_news("")
+            session.add_message("assistant", info)
+            return ("chat_reply", info)
+        except Exception as e:
+            logger.error(f"News tool error: {e}")
+            return ("chat_reply", "Sorry, couldn't get news right now.")
+
+    # Parse [JOKE]
+    if re.search(r'\[JOKE\]', reply_text):
+        try:
+            info = get_joke()
+            session.add_message("assistant", info)
+            return ("chat_reply", info)
+        except Exception as e:
+            logger.error(f"Joke tool error: {e}")
+            return ("chat_reply", "Sorry, couldn't get a joke right now.")
 
     # Parse [REMIND:text] [TIME:ISO] [METHOD:VOICE|EMAIL]
     remind_match = re.search(r'\[REMIND:(.+?)\]\s*\[TIME:(.+?)\]\s*\[METHOD:(VOICE|EMAIL)\]', reply_text)
@@ -301,10 +331,9 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> str:
                 logger.info(f"Reminder created via AI chat: {text} at {scheduled_time}")
         except Exception as e:
             logger.error(f"Failed to create reminder: {e}")
-        action = "set_reminder"
-        return action
+        return ("set_reminder", None)
 
-    return action
+    return ("chat_reply", None)
 
 
 async def handle_ai_chat(message: Dict[str, Any]):
@@ -383,13 +412,22 @@ async def handle_ai_chat(message: Dict[str, Any]):
         if not reply_text:
             reply_text = "Sorry, I didn't understand."
 
-        # Parse and execute command/reminder tags in AI response
-        action = await _parse_and_execute_tags(reply_text, int(user_id))
+        # Parse and execute action tags in AI response
+        action, tool_result = await _parse_and_execute_tags(reply_text, int(user_id))
 
-        session.add_message("assistant", reply_text)
+        # Strip raw tag lines from displayed text
+        clean_text = re.sub(r'\s*\[CMD:[^\]]+\](?:\s*\[DUR:\d+(?:\.\d+)?\])?(?:\s*\[ANG:\d+(?:\.\d+)?\])?\s*', ' ', reply_text)
+        clean_text = re.sub(r'\s*\[(?:WEATHER|REMIND|NEWS|JOKE):[^\]]*\]\s*', ' ', clean_text)
+        clean_text = re.sub(r'\s*\[TIME:[^\]]+\]\s*', ' ', clean_text)
+        clean_text = re.sub(r'\s*\[METHOD:(?:VOICE|EMAIL)\]\s*', ' ', clean_text)
+        clean_text = re.sub(r'\s+', ' ', clean_text).strip()
+
+        display_text = tool_result if tool_result else (clean_text or reply_text)
+
+        session.add_message("assistant", display_text)
         await manager.send_to_web({
             "type": "ai_chat_response",
-            "payload": {"text": reply_text, "action": action}
+            "payload": {"text": display_text, "action": action}
         })
     except Exception as e:
         logger.exception("AI chat error")
