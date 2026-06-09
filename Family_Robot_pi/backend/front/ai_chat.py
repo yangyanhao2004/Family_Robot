@@ -227,6 +227,59 @@ def _get_kimi() -> 'KimiClient':
     return _kimi_client
 
 
+async def _parse_and_execute_tags(reply_text: str, user_id: int) -> str:
+    """Parse [CMD:...] and [REMIND:...] tags in AI response and execute."""
+    action = "chat_reply"
+
+    # Parse [CMD:forward|backward|left|right|stop|servo1|servo2] [DUR:seconds] [ANG:degrees]
+    cmd_match = re.search(r'\[CMD:(forward|backward|left|right|stop|servo1|servo2)\]', reply_text)
+    if cmd_match:
+        command = cmd_match.group(1)
+        args: Dict[str, Any] = {"command": command}
+
+        dur_match = re.search(r'\[DUR:(\d+(?:\.\d+)?)\]', reply_text)
+        if dur_match:
+            args["duration"] = float(dur_match.group(1))
+
+        ang_match = re.search(r'\[ANG:(\d+(?:\.\d+)?)\]', reply_text)
+        if ang_match:
+            args["angle"] = float(ang_match.group(1))
+
+        session = session_manager.get_or_create(user_id)
+        await _execute_control_robot(args, session)
+        action = "control_robot"
+        return action
+
+    # Parse [REMIND:text] [TIME:ISO] [METHOD:VOICE|EMAIL]
+    remind_match = re.search(r'\[REMIND:(.+?)\]\s*\[TIME:(.+?)\]\s*\[METHOD:(VOICE|EMAIL)\]', reply_text)
+    if remind_match:
+        text = remind_match.group(1).strip()
+        scheduled_time = remind_match.group(2).strip()
+        method = remind_match.group(3).strip()
+        java_url = os.environ.get("JAVA_API_URL", "http://localhost:8090")
+        payload = {
+            "userId": user_id,
+            "text": text,
+            "scheduledTime": scheduled_time,
+            "method": method,
+            "email": "",
+            "enabled": True
+        }
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(
+                    f"{java_url}/api/reminders",
+                    json=payload
+                )
+                logger.info(f"Reminder created via AI chat: {text} at {scheduled_time}")
+        except Exception as e:
+            logger.error(f"Failed to create reminder: {e}")
+        action = "set_reminder"
+        return action
+
+    return action
+
+
 async def handle_ai_chat(message: Dict[str, Any]):
     payload = message.get("payload", {})
     user_id = payload.get("user_id")
@@ -257,17 +310,20 @@ async def handle_ai_chat(message: Dict[str, Any]):
         api_messages = [{"role": "system", "content": system_prompt}]
         api_messages.extend(session.get_messages())
 
-        # ---- Scheme B: Plain text chat (moonshot-v1-8k does not support tools) ----
+        # ---- Scheme B: Plain text chat with response parsing ----
         kimi = _get_kimi()
         reply_text = kimi.chat_messages(api_messages)
 
         if not reply_text:
             reply_text = "Sorry, I didn't understand."
 
+        # Parse and execute command/reminder tags in AI response
+        action = await _parse_and_execute_tags(reply_text, int(user_id))
+
         session.add_message("assistant", reply_text)
         await manager.send_to_web({
             "type": "ai_chat_response",
-            "payload": {"text": reply_text, "action": "chat_reply"}
+            "payload": {"text": reply_text, "action": action}
         })
     except Exception as e:
         logger.exception("AI chat error")
