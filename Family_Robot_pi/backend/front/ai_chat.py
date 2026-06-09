@@ -366,7 +366,7 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
         text = remind_match.group(1).strip()
         scheduled_time = remind_match.group(2).strip()
         method = remind_match.group(3).strip()
-        java_url = os.environ.get("JAVA_API_URL", "http://localhost:8090")
+        java_url = os.environ.get("JAVA_API_URL", "http://192.168.137.1:8090")
         payload = {
             "userId": user_id,
             "text": text,
