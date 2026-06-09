@@ -300,11 +300,10 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
     """Parse action tags in AI response. Returns (action, result_text_or_None)."""
     session = session_manager.get_or_create(user_id)
 
-    # Parse [CMD:...] tags — support multi-step sequences
+    # Parse [CMD:...] tags — enqueue all, send one consolidated response
     cmd_matches = list(re.finditer(r'\[CMD:(forward|backward|left|right|stop|servo1|servo2)\]', reply_text))
     if cmd_matches:
         logger.info(f"Parsed {len(cmd_matches)} CMD tags: {[m.group(1) for m in cmd_matches]}")
-        # Set medium speed before AI-commanded moves
         await _enqueue_command({"command": "speed_medium", "angle": 90})
         for idx, m in enumerate(cmd_matches):
             cmd_start = m.end()
@@ -312,21 +311,21 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int) -> tuple:
             cmd_segment = reply_text[cmd_start:next_start]
 
             command = m.group(1)
-            args: Dict[str, Any] = {"command": command}
+            cmd_args: Dict[str, Any] = {"command": command}
 
             dur_match = re.search(r'\[DUR:(\d+(?:\.\d+)?)\]', cmd_segment)
             if dur_match:
-                args["duration"] = float(dur_match.group(1))
+                cmd_args["duration"] = float(dur_match.group(1))
 
             ang_match = re.search(r'\[ANG:(\d+(?:\.\d+)?)\]', cmd_segment)
             if ang_match:
-                args["angle"] = float(ang_match.group(1))
+                cmd_args["angle"] = float(ang_match.group(1))
 
             spd_match = re.search(r'\[SPD:(low|medium|high)\]', cmd_segment)
             if spd_match:
                 await _enqueue_command({"command": "speed_" + spd_match.group(1), "angle": 90})
 
-            await _execute_control_robot(args, session)
+            await _enqueue_command(cmd_args)
         return ("control_robot", None)
 
     # Parse [WEATHER:city] — call tool and return result
@@ -474,11 +473,15 @@ async def handle_ai_chat(message: Dict[str, Any]):
         # Parse and execute action tags in AI response
         action, tool_result = await _parse_and_execute_tags(reply_text, int(user_id))
 
-        # Strip raw tag lines from displayed text
-        clean_text = re.sub(r'\s*\[CMD:[^\]]+\](?:\s*\[DUR:\d+(?:\.\d+)?\])?(?:\s*\[ANG:\d+(?:\.\d+)?\])?\s*', ' ', reply_text)
-        clean_text = re.sub(r'\s*\[(?:WEATHER|REMIND|NEWS|JOKE):[^\]]*\]\s*', ' ', clean_text)
-        clean_text = re.sub(r'\s*\[TIME:[^\]]+\]\s*', ' ', clean_text)
-        clean_text = re.sub(r'\s*\[METHOD:(?:VOICE|EMAIL)\]\s*', ' ', clean_text)
+        # Strip raw tag lines from displayed text (handle both spaced and concatenated)
+        clean_text = re.sub(r'\[CMD:[^\]]+\]', '', reply_text)
+        clean_text = re.sub(r'\[DUR:\d+(?:\.\d+)?\]', '', clean_text)
+        clean_text = re.sub(r'\[ANG:\d+(?:\.\d+)?\]', '', clean_text)
+        clean_text = re.sub(r'\[SPD:\w+\]', '', clean_text)
+        clean_text = re.sub(r'\[REMIND:[^\]]+\]', '', clean_text)
+        clean_text = re.sub(r'\[TIME:[^\]]+\]', '', clean_text)
+        clean_text = re.sub(r'\[METHOD:\w+\]', '', clean_text)
+        clean_text = re.sub(r'\[(?:WEATHER|NEWS|JOKE):?[^\]]*\]', '', clean_text)
         clean_text = re.sub(r'\s+', ' ', clean_text).strip()
 
         display_text = tool_result if tool_result else (clean_text or reply_text)
