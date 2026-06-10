@@ -1,3 +1,4 @@
+import asyncio
 import os
 import time
 from datetime import datetime, timezone, timedelta
@@ -37,13 +38,29 @@ async def handle_command_message(message: Dict[str, Any]) -> bool:
         return False
 
 
+_last_photo_seq: int = 0
+
+
 async def _handle_take_photo():
-    frame_bytes = video_hub.latest_frame
-    if not frame_bytes:
-        await manager.send_to_web(ErrorMessage(
-            type="error", message="No camera frame available yet"
-        ).model_dump())
-        return
+    global _last_photo_seq
+
+    # Wait for a fresh frame if we already captured the current one
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        item = await video_hub.wait_next_frame(_last_photo_seq, timeout_seconds=2.0)
+        if item is not None:
+            _last_photo_seq, frame_bytes = item
+            break
+    else:
+        # Fallback to latest frame (first photo or timeout)
+        frame_bytes = video_hub.latest_frame
+        if not frame_bytes:
+            await manager.send_to_web(ErrorMessage(
+                type="error", message="No camera frame available yet"
+            ).model_dump())
+            return
+        # Update seq so next capture waits for a new frame
+        _last_photo_seq = video_hub.latest_seq
 
     os.makedirs(PHOTOS_DIR, exist_ok=True)
 
