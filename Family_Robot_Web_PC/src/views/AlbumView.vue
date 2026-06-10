@@ -121,28 +121,27 @@ async function downloadFile(url: string, filename: string): Promise<boolean> {
 
 function downloadPhoto(photo: AlbumPhoto) {
   const filename = photo.url.split('/').pop() || `${photo.id}.jpg`
-  downloadFile(fullUrl(photo.url), filename)
+  const a = document.createElement('a')
+  a.href = fullUrl(photo.url)
+  a.download = filename
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => document.body.removeChild(a), 500)
 }
 
 async function downloadSelected() {
   if (downloading.value) return
   downloading.value = true
-  let failed = 0
-  try {
-    for (const id of selected.value) {
-      const photo = photos.value.find((p) => p.id === id)
-      if (!photo) continue
-      const ok = await downloadFile(fullUrl(photo.url), photo.url.split('/').pop() || `${id}.jpg`)
-      if (!ok) failed++
-      await new Promise((r) => setTimeout(r, 800))
-    }
-  } finally {
-    downloading.value = false
-    cleanupBlobUrls()
-    if (failed > 0) {
-      alert(`Download complete: ${selected.length - failed} succeeded, ${failed} failed.`)
+  for (let i = 0; i < selected.value.length; i++) {
+    const id = selected.value[i]
+    const photo = photos.value.find((p) => p.id === id)
+    if (photo) {
+      downloadPhoto(photo)
+      await new Promise((r) => setTimeout(r, 600))
     }
   }
+  downloading.value = false
 }
 </script>
 
