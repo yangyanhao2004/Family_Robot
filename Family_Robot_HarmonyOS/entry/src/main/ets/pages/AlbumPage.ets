@@ -131,11 +131,11 @@ struct AlbumPage {
           let fileName = id.includes('.') ? id : id + '.jpg'
           let ctx = getContext(this)
           let filePath = ctx.filesDir + '/' + fileName
-          let task = await request.downloadFile(ctx, {
-            url: photo.url,
-            filePath: filePath
+          let task = await request.downloadFile(ctx, { url: photo.url, filePath: filePath })
+          await new Promise<void>((res) => {
+            task.on('complete', () => res())
+            task.on('fail', () => res())
           })
-          await task.promise
           count++
         } catch (_e) {
           fail++
