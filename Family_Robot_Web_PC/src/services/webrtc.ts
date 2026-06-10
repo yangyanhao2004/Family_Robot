@@ -10,6 +10,7 @@ class WebRTCService {
   private isMicEnabled = true;
   private isSignalingBound = false;
   private stateListener: ((state: CallState) => void) | null = null;
+  private selectedMicId: string | undefined = undefined;
 
   private readonly iceServers: RTCIceServer[] = [
     { urls: ['stun:stun.l.google.com:19302'] },
@@ -20,10 +21,30 @@ class WebRTCService {
     this.handleSignalingMessage(message.data as WebRTCSignalPayload);
   };
 
+  async enumerateMics(): Promise<MediaDeviceInfo[]> {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((d) => d.kind === 'audioinput');
+  }
+
+  setMicrophone(deviceId: string): void {
+    this.selectedMicId = deviceId;
+    if (this.localStream) {
+      // Stop existing tracks so next getUserMedia uses new device
+      this.localStream.getTracks().forEach((t) => t.stop());
+      this.localStream = null;
+    }
+  }
+
   async preAcquireMic(): Promise<void> {
     if (this.localStream) return;
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      const constraints: MediaStreamConstraints = {
+        audio: this.selectedMicId
+          ? { deviceId: { exact: this.selectedMicId }, echoCancellation: false, noiseSuppression: false }
+          : { echoCancellation: false, noiseSuppression: false },
+        video: false,
+      };
+      this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
     } catch {
       // Mic not available or permission denied; will retry on call
     }
@@ -84,7 +105,13 @@ class WebRTCService {
     this.setupEventHandlers();
 
     if (!this.localStream) {
-      this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      const constraints: MediaStreamConstraints = {
+        audio: this.selectedMicId
+          ? { deviceId: { exact: this.selectedMicId }, echoCancellation: false, noiseSuppression: false }
+          : { echoCancellation: false, noiseSuppression: false },
+        video: false,
+      };
+      this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
     }
     this.localStream.getAudioTracks().forEach((track) => {
       track.enabled = this.isMicEnabled;

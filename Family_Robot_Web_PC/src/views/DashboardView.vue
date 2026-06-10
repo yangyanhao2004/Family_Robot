@@ -10,6 +10,22 @@ const store = useRobotStore()
 const isConnected = () => store.connectionStatus === 'connected'
 
 const callStatus = ref<'idle' | 'connecting' | 'connected'>('idle')
+const mics = ref<MediaDeviceInfo[]>([])
+const selectedMic = ref('')
+
+async function refreshMics() {
+  try {
+    mics.value = await webRTCService.enumerateMics()
+    if (!selectedMic.value && mics.value.length > 0) {
+      selectedMic.value = mics.value[0].deviceId
+    }
+  } catch { /* no mics */ }
+}
+
+function onMicChange() {
+  webRTCService.setMicrophone(selectedMic.value)
+}
+
 const activeKeys = ref<Record<string, boolean>>({})
 const pressedDir = ref<string | null>(null)
 const servo1Angle = ref(90)
@@ -168,6 +184,7 @@ onMounted(() => {
   webSocketService.addMessageListener(onPhotoCaptured)
   webRTCService.onCallStateChange(onCallStateChange)
   webRTCService.preAcquireMic()
+  refreshMics()
 })
 
 onUnmounted(() => {
@@ -183,6 +200,20 @@ onUnmounted(() => {
 
 <template>
   <div class="flex flex-col p-5 gap-6">
+    <!-- Mic selector -->
+    <div v-if="mics.length > 1" class="flex items-center gap-2">
+      <label class="text-xs text-neutral-400">Mic:</label>
+      <select
+        v-model="selectedMic"
+        @change="onMicChange()"
+        class="bg-[#222] border border-[#2A2A2A] rounded-lg px-3 py-1.5 text-sm text-neutral-300 outline-none"
+      >
+        <option v-for="mic in mics" :key="mic.deviceId" :value="mic.deviceId">
+          {{ mic.label || mic.deviceId.slice(0, 8) }}
+        </option>
+      </select>
+    </div>
+
     <!-- Call + Photo buttons -->
     <div class="flex gap-3">
       <button
