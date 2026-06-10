@@ -18,6 +18,7 @@ class ToolType(Enum):
     SYSTEM_STATUS = "get_system_status"
     JOKE = "get_joke"
     CLOUD = "cloud_handoff"
+    COMMAND = "control_robot"
     NONE = "none"
 
 
@@ -299,6 +300,11 @@ class Router:
         if "cloud_handoff" in response_lower:
             return ToolType.CLOUD, {"query": user_input}
 
+        # ---- Command detection (robot movement/servo) ----
+        cmd_result = self._detect_command(user_lower, user_input)
+        if cmd_result is not None:
+            return ToolType.COMMAND, cmd_result
+
         for phrase in self.TIME_PHRASES:
             if phrase in user_lower:
                 return ToolType.TIME, {}
@@ -319,6 +325,40 @@ class Router:
             return ToolType.NONE, {}
 
         return ToolType.CLOUD, {"query": user_input}
+
+    # ---- Robot command detection ----
+    COMMAND_KEYWORDS = {
+        'forward': ['forward', 'go forward', 'move forward', 'ahead', '前进', '往前', '向前'],
+        'backward': ['backward', 'go back', 'move back', 'backwards', '后退', '往后', '向后', '退后'],
+        'left': ['left', 'turn left', 'go left', '左转', '往左', '向左'],
+        'right': ['right', 'turn right', 'go right', '右转', '往右', '向右'],
+        'stop': ['stop', 'halt', 'freeze', '停', '停下', '停止'],
+        'servo1': ['pan', 'horizontal', '水平'],
+        'servo2': ['tilt', 'vertical', '垂直', '抬头', '低头'],
+    }
+
+    def _detect_command(self, user_lower: str, user_original: str) -> Optional[dict]:
+        """Detect robot movement/servo commands. Returns args dict or None."""
+        import re as _re
+
+        for cmd, phrases in self.COMMAND_KEYWORDS.items():
+            for phrase in phrases:
+                if phrase in user_lower:
+                    # Extract duration: "1 second", "2 seconds", "3s", "一秒", "两秒"
+                    dur_match = _re.search(
+                        r'(\d+)\s*(?:second|sec|s|秒)(?:s)?|'
+                        r'(one|two|three|four|five|1|2|3|4|5)\s*(?:second|sec|s)(?:s)?|'
+                        r'(一|二|三|四|五|两|1|2|3|4|5)\s*秒',
+                        user_lower
+                    )
+                    duration = None
+                    if dur_match:
+                        num_str = dur_match.group(1) or dur_match.group(2) or dur_match.group(3)
+                        num_map = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+                                   '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '两': 2}
+                        duration = float(num_map.get(num_str, num_str or 0))
+                    return {"command": cmd, "duration": duration, "explanation": f"OK, {cmd} for {duration}s" if duration else f"OK, {cmd}"}
+        return None
 
     def _has_explicit_tool_request(self, user_lower: str) -> bool:
         """Detect clear tool requests that should override chat heuristics."""

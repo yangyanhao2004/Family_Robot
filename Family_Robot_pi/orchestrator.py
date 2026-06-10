@@ -27,6 +27,7 @@ from brain.tools.weather_tool import WeatherTool
 from brain.tools.news_tool import NewsTool
 from brain.tools.system_tool import get_system_status
 from brain.tools.joke_tool import get_joke
+from brain.voice_commands import enqueue_voice_command
 from brain.cloud_client import KimiClient
 from brain.session_manager import session_manager
 from senses.wake_word_detector import WakeWordDetector
@@ -447,6 +448,15 @@ class Orchestrator:
             response = get_joke()
             session.add_message("assistant", response)
             self._speak(response)
+
+        elif result.tool == ToolType.COMMAND:
+            cmd = result.arguments.get("command", "stop")
+            duration = result.arguments.get("duration")
+            explanation = result.arguments.get("explanation", f"OK, {cmd}")
+            print(f"[tool] control_robot -> {cmd}" + (f" for {duration}s" if duration else ""))
+            enqueue_voice_command(cmd, 90.0, duration)
+            session.add_message("assistant", explanation)
+            self._speak(explanation)
 
         elif result.tool == ToolType.CLOUD:
             print("[cloud] Handing off to cloud AI (moonshot-v1-8k)")

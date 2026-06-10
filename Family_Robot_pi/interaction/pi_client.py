@@ -10,6 +10,7 @@ from websockets.exceptions import ConnectionClosed
 from .robot import SUPPORTED_COMMANDS, RobotController, SerialRobotController
 from .webrtc_call import PiWebRTCCallBridge
 from senses.camera_streamer import CameraStreamer
+from brain.voice_commands import drain_voice_commands
 
 
 logging.basicConfig(
@@ -251,6 +252,28 @@ class PiWebSocketClient:
                 logger.error("Status send failed: %s", exc)
                 await asyncio.sleep(self.status_interval)
 
+    async def _voice_cmd_poller(self):
+        """Poll for voice commands from the orchestrator thread."""
+        while self._running:
+            try:
+                cmds = drain_voice_commands()
+                for cmd in cmds:
+                    command = cmd.get("command", "stop")
+                    angle = cmd.get("angle", 90.0)
+                    duration = cmd.get("duration")
+                    logger.info(f"Voice command: {command} (angle={angle}, duration={duration})")
+                    if command == "stop" or command.startswith("speed_"):
+                        self.controller.execute_command(command, float(angle))
+                    else:
+                        self.controller.execute_command(command, float(angle))
+                        if duration and isinstance(duration, (int, float)) and duration > 0:
+                            await asyncio.sleep(float(duration))
+                            self.controller.execute_command("stop", 90.0)
+                await asyncio.sleep(0.2)
+            except Exception as e:
+                logger.error(f"Voice command poller error: {e}")
+                await asyncio.sleep(1.0)
+
     async def _send_json(self, websocket, payload: dict):
         await websocket.send(json.dumps(payload))
 
@@ -306,6 +329,7 @@ class PiWebSocketClient:
             camera_task = None
             if self._camera_started:
                 camera_task = asyncio.create_task(self._camera_sender(websocket))
+            voice_cmd_task = asyncio.create_task(self._voice_cmd_poller())
             try:
                 async for message in websocket:
                     if not self._running:
@@ -315,6 +339,7 @@ class PiWebSocketClient:
                 status_task.cancel()
                 if camera_task:
                     camera_task.cancel()
+                voice_cmd_task.cancel()
                 try:
                     await status_task
                 except asyncio.CancelledError:
