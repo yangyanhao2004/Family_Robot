@@ -1,0 +1,17 @@
+# HarmonyOS
+/build/
+/entry/build/
+/local.properties
+/.idea/
+/*.iml
+
+# Dependencies
+/node_modules/
+oh_modules/
+
+# Test
+/test/
+
+# Misc
+.DS_Store
+*.log

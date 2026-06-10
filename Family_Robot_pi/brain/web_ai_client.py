@@ -110,7 +110,7 @@ For casual chat: just reply naturally, no special tags.
 First reply naturally, then put action tags BELOW. Use one line per tag:
 
 [CMD:forward|backward|left|right|stop|servo1|servo2] [DUR:seconds] [ANG:degrees] [SPD:low|medium|high]
-  DUR is optional (omit for continuous movement). Default speed is medium.
+  DUR is optional (omit for continuous movement). Default speed is low.
   ANG only for servos. Turn angles: ~25°/second. 45° ≈ [DUR:2], 90° ≈ [DUR:4]
   servo1=horizontal(0=right,90=center,180=left) servo2=vertical(0=up,90=level,180=down)
 

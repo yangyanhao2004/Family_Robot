@@ -304,7 +304,7 @@ async def _parse_and_execute_tags(reply_text: str, user_id: int, user_email: str
     cmd_matches = list(re.finditer(r'\[CMD:(forward|backward|left|right|stop|servo1|servo2)\]', reply_text))
     if cmd_matches:
         logger.info(f"Parsed {len(cmd_matches)} CMD tags: {[m.group(1) for m in cmd_matches]}")
-        await _enqueue_command({"command": "speed_medium", "angle": 90})
+        await _enqueue_command({"command": "speed_low", "angle": 90})
         for idx, m in enumerate(cmd_matches):
             cmd_start = m.end()
             next_start = cmd_matches[idx + 1].start() if idx + 1 < len(cmd_matches) else len(reply_text)

@@ -1,0 +1,24 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Family Robot HarmonyOS App — 家庭服务机器人控制端"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Family Robot main entry"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Family Robot"
+    },
+    {
+      "name": "internet_permission_reason",
+      "value": "需要网络连接以与机器人后端通信"
+    },
+    {
+      "name": "network_permission_reason",
+      "value": "需要检测网络状态以自动重连"
+    }
+  ]
+}
