@@ -450,6 +450,8 @@ class Orchestrator:
             self._speak(response)
 
         elif result.tool == ToolType.COMMAND:
+            # Set medium speed first
+            enqueue_voice_command("speed_medium", 90.0)
             steps = result.arguments.get("steps")
             if steps:
                 # Multi-step command
