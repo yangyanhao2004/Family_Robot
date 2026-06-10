@@ -14,7 +14,6 @@ const photos = ref<AlbumPhoto[]>([])
 const selected = ref<string[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
-const downloading = ref(false)
 
 onMounted(async () => {
   try {
@@ -47,8 +46,6 @@ function selectAll() {
     selected.value = photos.value.map((p) => p.id)
   }
 }
-
-const _blobUrls: string[] = []
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
@@ -119,29 +116,74 @@ async function downloadFile(url: string, filename: string): Promise<boolean> {
   return false
 }
 
-function downloadPhoto(photo: AlbumPhoto) {
-  const filename = photo.url.split('/').pop() || `${photo.id}.jpg`
+// Download queue state
+const downloadQueue = ref<string[]>([])
+const downloadProgress = ref({ current: 0, total: 0, failed: 0 })
+const downloadStatus = ref('') // '' | 'downloading' | 'done'
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = fullUrl(photo.url)
+  a.href = url
   a.download = filename
   a.style.display = 'none'
   document.body.appendChild(a)
   a.click()
-  setTimeout(() => document.body.removeChild(a), 500)
+  setTimeout(() => {
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, 2000)
 }
 
-async function downloadSelected() {
-  if (downloading.value) return
-  downloading.value = true
-  for (let i = 0; i < selected.value.length; i++) {
-    const id = selected.value[i]
+async function fetchAndDownload(url: string, filename: string): Promise<boolean> {
+  try {
+    const res = await fetch(url)
+    if (res.ok) {
+      downloadBlob(await res.blob(), filename)
+      return true
+    }
+  } catch { /* fall through */ }
+
+  // Canvas fallback via CORS image
+  try {
+    const img = await loadImageCORS(url)
+    const blob = await canvasBlob(img)
+    if (blob) {
+      downloadBlob(blob, filename)
+      return true
+    }
+  } catch { /* fall through */ }
+
+  return false
+}
+
+async function processDownloadQueue() {
+  if (downloadStatus.value === 'downloading') return
+  downloadStatus.value = 'downloading'
+  const ids = [...downloadQueue.value]
+  downloadQueue.value = []
+  downloadProgress.value = { current: 0, total: ids.length, failed: 0 }
+
+  for (const id of ids) {
     const photo = photos.value.find((p) => p.id === id)
     if (photo) {
-      downloadPhoto(photo)
-      await new Promise((r) => setTimeout(r, 600))
+      const filename = photo.url.split('/').pop() || `${id}.jpg`
+      const ok = await fetchAndDownload(fullUrl(photo.url), filename)
+      if (!ok) downloadProgress.value.failed++
+    } else {
+      downloadProgress.value.failed++
     }
+    downloadProgress.value.current++
   }
-  downloading.value = false
+
+  downloadStatus.value = 'done'
+  setTimeout(() => { downloadStatus.value = '' }, 3000)
+}
+
+function downloadSelected() {
+  if (downloadStatus.value === 'downloading') return
+  downloadQueue.value = [...selected.value]
+  processDownloadQueue()
 }
 </script>
 
@@ -162,13 +204,19 @@ async function downloadSelected() {
           </button>
           <button
             v-if="selected.length"
-            :disabled="downloading"
+            :disabled="downloadStatus === 'downloading'"
             class="px-3 py-1.5 text-xs border rounded flex items-center gap-1 transition-colors"
-            :class="downloading ? 'text-neutral-500 border-neutral-700 cursor-not-allowed' : 'text-blue-400 hover:text-blue-300 border-blue-500/30'"
+            :class="downloadStatus === 'downloading' ? 'text-neutral-500 border-neutral-700 cursor-not-allowed' : 'text-blue-400 hover:text-blue-300 border-blue-500/30'"
             @click="downloadSelected"
           >
             <Download class="w-3 h-3" />
-            {{ downloading ? 'Downloading...' : 'Download' }}
+            <span v-if="downloadStatus === 'downloading'">
+              {{ downloadProgress.current }}/{{ downloadProgress.total }}
+            </span>
+            <span v-else-if="downloadStatus === 'done'">
+              Done ({{ downloadProgress.total - downloadProgress.failed }} ok)
+            </span>
+            <span v-else>Download</span>
           </button>
           <button
             v-if="selected.length"
@@ -219,7 +267,7 @@ async function downloadSelected() {
 
         <button
           class="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-          @click.stop="downloadPhoto(photo)"
+          @click.stop="downloadQueue = [photo.id]; processDownloadQueue()"
         >
           <Download class="w-3.5 h-3.5 text-white" />
         </button>
