@@ -87,12 +87,17 @@ function downloadBlob(blob: Blob, filename: string) {
   }, 2000)
 }
 
+const downloadErrors = ref<string[]>([])
+
 async function fetchAndDownload(url: string, filename: string): Promise<boolean> {
   try {
     const res = await fetch(url)
     if (res.ok) {
       downloadBlob(await res.blob(), filename)
       return true
+    }
+    if (res.status === 404) {
+      downloadErrors.value.push(`${filename}: file not found on device`)
     }
   } catch { /* fall through */ }
 
@@ -106,11 +111,15 @@ async function fetchAndDownload(url: string, filename: string): Promise<boolean>
     }
   } catch { /* fall through */ }
 
+  if (downloadErrors.value.length === 0) {
+    downloadErrors.value.push(`${filename}: download failed`)
+  }
   return false
 }
 
 async function processDownloadQueue() {
   if (downloadStatus.value === 'downloading') return
+  downloadErrors.value = []
   downloadStatus.value = 'downloading'
   const ids = [...downloadQueue.value]
   downloadQueue.value = []
@@ -188,7 +197,11 @@ function downloadSelected() {
       <p class="text-xs text-red-400">{{ error }}</p>
     </div>
 
-    <div v-else class="grid grid-cols-2 gap-3">
+    <div v-else>
+      <div v-if="downloadErrors.length" class="mb-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+        <p v-for="(err, i) in downloadErrors" :key="i" class="text-xs text-red-400">{{ err }}</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
       <div
         v-for="photo in photos"
         :key="photo.id"
@@ -224,6 +237,7 @@ function downloadSelected() {
           <Download class="w-3.5 h-3.5 text-white" />
         </button>
       </div>
+    </div>
     </div>
   </div>
 </template>
