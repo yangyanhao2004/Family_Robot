@@ -301,9 +301,27 @@ class Router:
             return ToolType.CLOUD, {"query": user_input}
 
         # ---- Command detection (robot movement/servo) ----
-        cmd_result = self._detect_command(user_lower, user_input)
-        if cmd_result is not None:
-            return ToolType.COMMAND, cmd_result
+        # Split multi-step: "forward 1s and back 1s" -> ["forward 1s", "back 1s"]
+        import re as _re2
+        parts = _re2.split(r'\s+(?:and|然后|接着|之后|再)\s+', user_lower)
+        cmd_results = []
+        for part in parts:
+            part = part.strip()
+            if part:
+                r = self._detect_command(part, part)
+                if r is not None:
+                    cmd_results.append(r)
+        if cmd_results:
+            # Merge durations from all steps
+            merged = dict(cmd_results[0])
+            if len(cmd_results) > 1:
+                merged["steps"] = cmd_results
+                merged["command"] = "multi"
+                merged["explanation"] = "OK, executing " + ", ".join(
+                    f"{c.get('command', '?')}" + (f" for {c.get('duration', 0)}s" if c.get('duration') else "")
+                    for c in cmd_results
+                )
+            return ToolType.COMMAND, merged
 
         for phrase in self.TIME_PHRASES:
             if phrase in user_lower:

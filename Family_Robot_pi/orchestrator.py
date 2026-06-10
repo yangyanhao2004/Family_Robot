@@ -450,11 +450,20 @@ class Orchestrator:
             self._speak(response)
 
         elif result.tool == ToolType.COMMAND:
-            cmd = result.arguments.get("command", "stop")
-            duration = result.arguments.get("duration")
-            explanation = result.arguments.get("explanation", f"OK, {cmd}")
-            print(f"[tool] control_robot -> {cmd}" + (f" for {duration}s" if duration else ""))
-            enqueue_voice_command(cmd, 90.0, duration)
+            steps = result.arguments.get("steps")
+            if steps:
+                # Multi-step command
+                for step in steps:
+                    cmd = step.get("command", "stop")
+                    duration = step.get("duration")
+                    print(f"[tool] control_robot -> {cmd}" + (f" for {duration}s" if duration else ""))
+                    enqueue_voice_command(cmd, 90.0, duration)
+            else:
+                cmd = result.arguments.get("command", "stop")
+                duration = result.arguments.get("duration")
+                print(f"[tool] control_robot -> {cmd}" + (f" for {duration}s" if duration else ""))
+                enqueue_voice_command(cmd, 90.0, duration)
+            explanation = result.arguments.get("explanation", "OK")
             session.add_message("assistant", explanation)
             self._speak(explanation)
 
