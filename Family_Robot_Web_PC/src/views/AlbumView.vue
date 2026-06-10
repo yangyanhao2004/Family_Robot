@@ -47,27 +47,6 @@ function selectAll() {
   }
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  _blobUrls.push(url)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  setTimeout(() => {
-    document.body.removeChild(a)
-  }, 1000)
-}
-
-function cleanupBlobUrls() {
-  for (const url of _blobUrls) {
-    URL.revokeObjectURL(url)
-  }
-  _blobUrls.length = 0
-}
-
 function canvasBlob(img: HTMLImageElement): Promise<Blob | null> {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas')
@@ -87,33 +66,6 @@ function loadImageCORS(url: string): Promise<HTMLImageElement> {
     img.onerror = () => reject(new Error('Image load failed'))
     img.src = url
   })
-}
-
-async function downloadFile(url: string, filename: string): Promise<boolean> {
-  // 1) Try fetch (original quality)
-  try {
-    const res = await fetch(url)
-    if (res.ok) {
-      downloadBlob(await res.blob(), filename)
-      return true
-    }
-  } catch {
-    // fetch failed, continue to canvas fallback
-  }
-
-  // 2) Canvas fallback via CORS image load
-  try {
-    const img = await loadImageCORS(url)
-    const blob = await canvasBlob(img)
-    if (blob) {
-      downloadBlob(blob, filename)
-      return true
-    }
-  } catch {
-    // both methods failed
-  }
-
-  return false
 }
 
 // Download queue state
