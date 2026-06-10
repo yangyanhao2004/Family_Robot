@@ -209,7 +209,10 @@ onUnmounted(() => {
         class="bg-[#222] border border-[#2A2A2A] rounded-lg px-3 py-1.5 text-sm text-neutral-300 outline-none"
       >
         <option v-for="mic in mics" :key="mic.deviceId" :value="mic.deviceId">
-          {{ mic.label || mic.deviceId.slice(0, 8) }}
+          {{ mic.label.includes('Comm') || mic.label.includes('通讯') ? '蓝牙耳机 (通话)' :
+             mic.label.includes('Bluetooth') || mic.label.includes('蓝牙') ? '蓝牙耳机 (立体声)' :
+             mic.label.includes('Array') || mic.label.includes('阵列') ? '电脑麦克风' :
+             mic.label.length > 25 ? mic.label.slice(0, 25) + '…' : mic.label }}
         </option>
       </select>
     </div>

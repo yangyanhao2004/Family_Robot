@@ -23,7 +23,29 @@ class WebRTCService {
 
   async enumerateMics(): Promise<MediaDeviceInfo[]> {
     const devices = await navigator.mediaDevices.enumerateDevices();
-    return devices.filter((d) => d.kind === 'audioinput');
+    const mics = devices.filter((d) => d.kind === 'audioinput');
+
+    // Deduplicate: group by label substring match, prefer comm variant
+    const result: MediaDeviceInfo[] = [];
+    const seen = new Set<string>();
+    for (const mic of mics) {
+      // Extract device name: strip prefixes like "Default - " "Communications - "
+      const name = mic.label.replace(/^(默认\s*-\s*|Default\s*-\s*|通讯\s*-\s*|Communications\s*-\s*)/i, '').trim();
+      if (seen.has(name)) {
+        // Already seen — if this is the comm variant, replace the existing
+        const isComm = /通讯|comm/i.test(mic.label);
+        if (isComm) {
+          const idx = result.findIndex((m) =>
+            m.label.replace(/^(默认\s*-\s*|Default\s*-\s*|通讯\s*-\s*|Communications\s*-\s*)/i, '').trim() === name
+          );
+          if (idx >= 0) result[idx] = mic;
+        }
+        continue;
+      }
+      seen.add(name);
+      result.push(mic);
+    }
+    return result;
   }
 
   setMicrophone(deviceId: string): void {
