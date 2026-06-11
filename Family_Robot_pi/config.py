@@ -26,9 +26,9 @@ class Config:
 
     # Whisper.cpp
     whisper_path: str = "/usr/local/bin/whisper-cpp"
-    whisper_model: str = "whisper.cpp/models/ggml-base.bin"
+    whisper_model: str = "whisper.cpp/models/ggml-base-q5_1.bin"
     stt_language: str = "zh"
-    whisper_threads: int = 2
+    whisper_threads: int = 4
 
     # Models
     chat_model: str = "qwen2.5:1.5b"
