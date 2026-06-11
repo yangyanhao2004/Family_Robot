@@ -334,7 +334,7 @@ class Router:
         # ---- Command detection (robot movement/servo) ----
         # Split multi-step: "forward 1s and back 1s" -> ["forward 1s", "back 1s"]
         import re as _re2
-        parts = _re2.split(r'\s+(?:and|\u7136\u540e|\u63a5\u7740|\u4e4b\u540e|\u518d)\s+', user_lower)
+        parts = _re2.split(r'(?:and|\u7136\u540e|\u63a5\u7740|\u4e4b\u540e|\u518d)', user_lower)
         cmd_results = []
         for part in parts:
             part = part.strip()
@@ -348,8 +348,9 @@ class Router:
             if len(cmd_results) > 1:
                 merged["steps"] = cmd_results
                 merged["command"] = "multi"
-                merged["explanation"] = "OK, executing " + ", ".join(
-                    f"{c.get('command', '?')}" + (f" for {c.get('duration', 0)}s" if c.get('duration') else "")
+                merged["explanation"] = "好的，" + "、".join(
+                    self._CMD_NAMES.get(c.get("command", ""), c.get("command", "?"))
+                    + (f"{c.get('duration', 0):.0f}秒" if c.get("duration") else "")
                     for c in cmd_results
                 )
             return ToolType.COMMAND, merged
@@ -386,6 +387,12 @@ class Router:
         'servo2': ['tilt', 'vertical', '\u5782\u76f4', '\u62ac\u5934', '\u4f4e\u5934'],
     }
 
+    _CMD_NAMES = {
+        'forward': '\u524d\u8fdb', 'backward': '\u540e\u9000', 'left': '\u5de6\u8f6c',
+        'right': '\u53f3\u8f6c', 'stop': '\u505c\u6b62', 'servo1': '\u6c34\u5e73\u8f6c\u52a8',
+        'servo2': '\u5782\u76f4\u8f6c\u52a8',
+    }
+
     def _detect_command(self, user_lower: str, user_original: str) -> Optional[dict]:
         """Detect robot movement/servo commands. Returns args dict or None."""
         import re as _re
@@ -406,7 +413,12 @@ class Router:
                         num_map = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
                                    '\u4e00': 1, '\u4e8c': 2, '\u4e09': 3, '\u56db': 4, '\u4e94': 5, '\u4e24': 2}
                         duration = float(num_map.get(num_str, num_str or 0))
-                    return {"command": cmd, "duration": duration, "explanation": f"OK, {cmd} for {duration}s" if duration else f"OK, {cmd}"}
+                    cn_name = self._CMD_NAMES.get(cmd, cmd)
+                    return {
+                        "command": cmd,
+                        "duration": duration,
+                        "explanation": f"{cn_name}{f'{duration:.0f}秒' if duration else ''}",
+                    }
         return None
 
     def _has_explicit_tool_request(self, user_lower: str) -> bool:
