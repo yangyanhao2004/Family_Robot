@@ -101,6 +101,15 @@ class EmotionDetector:
             "speech_rate": speech_rate,
         }
 
+        # ---- Debug: dump features for threshold tuning ----
+        import sys
+        print(
+            f"[emotion-feat] e={energy_mean:.4f} es={energy_std:.4f} "
+            f"p={pitch_mean:.0f} ps={pitch_std:.0f} "
+            f"zcr={zcr_mean:.3f} cent={centroid_mean:.0f} rate={speech_rate:.1f}",
+            file=sys.stderr, flush=True,
+        )
+
         # ---- Heuristic classifier ----
         label, conf = self._classify(features)
         return EmotionResult(label, conf, features)
@@ -172,26 +181,24 @@ class EmotionDetector:
         zcr = f["zcr_mean"]
         rate = f["speech_rate"]
 
-        # Thresholds tuned for Chinese speech (higher natural F0 than English)
-        high_energy = e_mean > 0.08
-        low_energy = e_mean < 0.018
-        high_pitch = p_mean > 230       # Chinese: higher baseline
-        low_pitch = p_mean < 130        # Chinese: higher baseline
-        very_high_pitch_var = p_std > 55
-        high_pitch_var = p_std > 40
-        fast = rate > 5.5
-        slow = rate < 2.2
+        # Thresholds — relaxed to catch more emotions; will tighten with real data
+        high_energy = e_mean > 0.04
+        low_energy = e_mean < 0.012
+        high_pitch = p_mean > 160
+        low_pitch = p_mean < 120
+        high_pitch_var = p_std > 25
+        fast = rate > 4.0
+        slow = rate < 2.0
 
-        if high_energy and very_high_pitch_var and fast:
-            return "angry", 0.75
+        if high_energy and high_pitch_var and fast:
+            return "angry", 0.70
         if high_pitch and high_energy and fast:
-            return "happy", 0.78
-        if high_pitch and high_pitch_var and not high_energy and not slow:
+            return "happy", 0.72
+        if high_pitch and high_pitch_var and not slow:
             return "fearful", 0.60
         if low_pitch and low_energy:
-            return "sad", 0.75
+            return "sad", 0.70
         if low_energy and slow:
             return "sad", 0.65
 
-        # Default
-        return "neutral", 0.72
+        return "neutral", 0.68
