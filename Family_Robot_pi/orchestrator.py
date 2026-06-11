@@ -499,7 +499,7 @@ class Orchestrator:
             self._speak(explanation)  # no emotion prefix for commands
 
         elif result.tool == ToolType.CLOUD:
-            print("[云端] 转交云端 AI (moonshot-v1-32k)")
+            print("[云端] 转交云端 AI (kimi-latest)")
             query = result.arguments.get("query", text)
             self._handle_cloud_query(query, emotion_result)
 

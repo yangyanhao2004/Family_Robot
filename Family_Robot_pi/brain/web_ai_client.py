@@ -165,7 +165,7 @@ class KimiK25Client:
     """Async client for Kimi K2.5 (Moonshot API) with function calling."""
 
     BASE_URL = "https://api.moonshot.cn/v1"
-    MODEL = "moonshot-v1-8k"
+    MODEL = "kimi-latest"
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("MOONSHOT_API_KEY")
