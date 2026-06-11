@@ -218,6 +218,28 @@ class Router:
         self.allow_cloud_handoff = allow_cloud_handoff
         self.conversation_history = []
 
+    # Traditional → Simplified Chinese mapping for keyword matching.
+    # whisper.cpp zh model outputs Traditional; our keywords are Simplified.
+    _T2S = str.maketrans(
+        "氣麼幾嗎時聞條頭發樣"
+        "關於會過來對體點號電"
+        "話見說聽寫讓業東衝國"
+        "絕綜變熱滿灑獲從當兩"
+        "無舉處謂樂營僅嚴回廚"
+        "請設計難重準單",
+        "气么几吗时闻条头发样"
+        "关于会过来对体点号电"
+        "话见说听写让业东冲国"
+        "绝综变热满洒获从当两"
+        "无举处谓乐营仅严回厨"
+        "请设计难重准单",
+    )
+
+    @staticmethod
+    def _simplify(text: str) -> str:
+        """Convert common Traditional Chinese chars to Simplified for matching."""
+        return text.translate(Router._T2S)
+
     def _is_local_chat(self, user_input: str) -> bool:
         """Check if the input is simple enough for local handling."""
         user_lower = user_input.lower().strip()
@@ -298,15 +320,8 @@ class Router:
         """
         Detect tool requests from user text and fallback model text.
         """
-        user_lower = user_input.lower()
+        user_lower = self._simplify(user_input.lower())
         response_lower = (response_text or "").lower()
-
-        import sys
-        u8 = user_lower.encode("utf-8", errors="replace")
-        p0 = self.WEATHER_PHRASES[0].encode("utf-8", errors="replace")
-        print(f"[router-hex] user_lower({len(user_lower)}c, {len(u8)}b)={u8.hex()}", file=sys.stderr, flush=True)
-        print(f"[router-hex] WEATHER[0]={p0.hex()} -> {self.WEATHER_PHRASES[0]!r}", file=sys.stderr, flush=True)
-        print(f"[router-hex] match={self.WEATHER_PHRASES[0] in user_lower}", file=sys.stderr, flush=True)
 
         if "get_current_time" in response_lower:
             return ToolType.TIME, {}
