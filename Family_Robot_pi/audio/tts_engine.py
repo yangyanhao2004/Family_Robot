@@ -1,12 +1,17 @@
 """
-Piper TTS wrapper using the piper-tts Python package.
+TTS engines: Piper (English) and Edge TTS (Chinese via Microsoft neural voices).
 """
 
+import asyncio
 import os
+import subprocess
 import tempfile
 import wave
 from pathlib import Path
 from typing import Optional
+
+
+# ─── Piper TTS (English) ────────────────────────────────────────────────
 
 try:
     from piper import PiperVoice
@@ -61,7 +66,7 @@ def _resolve_voice_path(model_path: str) -> Path:
 
 
 class PiperTTS:
-    """Piper TTS engine wrapper."""
+    """Piper TTS engine wrapper (English only)."""
 
     def __init__(
         self,
@@ -89,3 +94,59 @@ class PiperTTS:
             self._voice.synthesize_wav(text, wav_file, syn_config=syn_config)
 
         return output_path
+
+
+# ─── Edge TTS (Chinese / multilingual) ──────────────────────────────────
+
+class EdgeTTS:
+    """Microsoft Edge neural TTS via edge-tts (free, no API key needed)."""
+
+    def __init__(
+        self,
+        voice: str = "zh-CN-XiaoxiaoNeural",
+    ):
+        self.voice = voice
+        self._check_installed()
+
+    @staticmethod
+    def _check_installed():
+        try:
+            import edge_tts  # noqa: F401
+        except ImportError:
+            raise RuntimeError(
+                "edge-tts not installed. Run: pip install edge-tts"
+            )
+
+    def synthesize(self, text: str, output_path: Optional[str] = None) -> str:
+        """Synthesize Chinese text into an MP3 file, return its path."""
+        if output_path is None:
+            fd, output_path = tempfile.mkstemp(suffix=".mp3")
+            os.close(fd)
+
+        try:
+            asyncio.run(self._synthesize_async(text, output_path))
+        except RuntimeError:
+            # If there's already a running event loop, fall back to CLI
+            self._synthesize_cli(text, output_path)
+
+        return output_path
+
+    async def _synthesize_async(self, text: str, output_path: str):
+        import edge_tts
+
+        communicate = edge_tts.Communicate(text, self.voice)
+        await communicate.save(output_path)
+
+    def _synthesize_cli(self, text: str, output_path: str):
+        """Fallback: use edge-tts CLI."""
+        subprocess.run(
+            [
+                "edge-tts",
+                "--voice", self.voice,
+                "--text", text,
+                "--write-media", output_path,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )

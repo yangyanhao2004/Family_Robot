@@ -10,7 +10,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WHISPER_PATH = Path("/usr/local/bin/whisper-cpp")
-DEFAULT_WHISPER_MODEL = PROJECT_ROOT / "whisper.cpp" / "models" / "ggml-tiny.en-q5_0.bin"
+DEFAULT_WHISPER_MODEL = PROJECT_ROOT / "whisper.cpp" / "models" / "ggml-base.bin"
 ALT_WHISPER_PATHS = [
     PROJECT_ROOT / "whisper.cpp" / "build" / "bin" / "whisper-cli",
     Path("/home/ip/whisper.cpp/build/bin/whisper-cli"),
@@ -20,6 +20,7 @@ LEGACY_WHISPER_MODEL_DIRS = [
     Path.home() / "whisper.cpp" / "models",
 ]
 FAST_MODEL_NAMES = [
+    "ggml-base.bin",
     "ggml-tiny.en-q5_0.bin",
     "ggml-tiny.en.bin",
     "ggml-base.en-q5_0.bin",
@@ -111,7 +112,7 @@ class WhisperSTT:
         self,
         whisper_path: str = str(DEFAULT_WHISPER_PATH),
         model_path: str = str(DEFAULT_WHISPER_MODEL),
-        language: str = "en",
+        language: str = "zh",
         threads: int = 4,
     ):
         self.whisper_path = str(_resolve_whisper_binary(whisper_path))

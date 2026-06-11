@@ -35,174 +35,175 @@ class Router:
     """Routes user queries to direct replies, tools, or Ollama."""
 
     TIME_PHRASES = [
-        "what time",
-        "what's the time",
-        "current time",
-        "what day is it",
-        "what's the date",
-        "what date",
+        "几点",
+        "几点钟",
+        "现在时间",
+        "现在几点",
+        "今天几号",
+        "今天日期",
+        "什么时间",
+        "什么日期",
+        "几点了",
     ]
     WEATHER_PHRASES = [
-        "weather in",
-        "weather for",
-        "what's the weather",
-        "how's the weather",
-        "temperature in",
-        "weather now",
-        "weather today",
+        "天气",
+        "气温",
+        "温度",
+        "多少度",
+        "冷不冷",
+        "热不热",
+        "下雨",
+        "刮风",
     ]
     NEWS_PHRASES = [
-        "news",
-        "headlines",
-        "what's happening",
-        "whats happening",
-        "current events",
-        "top stories",
+        "新闻",
+        "头条",
+        "最近发生",
+        "今天有什么",
+        "最新消息",
+        "时事",
     ]
     SYSTEM_PHRASES = [
-        "system status",
-        "how are you doing",
-        "how are you feeling",
-        "your temperature",
-        "cpu temp",
-        "health check",
-        "how's your health",
-        "how you doing",
+        "系统状态",
+        "你怎么样",
+        "你的温度",
+        "CPU温度",
+        "健康检查",
+        "身体如何",
+        "你还好吗",
     ]
     JOKE_PHRASES = [
-        "tell me a joke",
-        "joke",
-        "make me laugh",
-        "something funny",
-        "say something funny",
+        "讲个笑话",
+        "笑话",
+        "逗我笑",
+        "搞笑",
+        "说个有意思的",
+        "幽默",
     ]
 
     LOCAL_PHRASES = [
-        "hello",
-        "hi",
-        "hey",
-        "good morning",
-        "good afternoon",
-        "good evening",
-        "how are you",
-        "how do you do",
-        "what's up",
-        "who are you",
-        "what are you",
-        "what are you doing",
-        "what's your name",
-        "what are your name",
-        "thank you",
-        "thanks",
-        "bye",
-        "goodbye",
-        "see you",
-        "good night",
-        "help",
-        "what can you do",
+        "你好",
+        "嗨",
+        "嘿",
+        "早上好",
+        "下午好",
+        "晚上好",
+        "你好吗",
+        "你是谁",
+        "你是什么",
+        "你在做什么",
+        "你叫什么",
+        "你的名字",
+        "谢谢",
+        "感谢",
+        "再见",
+        "拜拜",
+        "晚安",
+        "帮助",
+        "你能做什么",
     ]
 
     DIRECT_RESPONSES = [
         (
-            r"^(good morning|good afternoon|good evening|hello|hi|hey)[!. ]*$",
-            "Hello. I'm here with you.",
+            r"^(早上好|下午好|晚上好|你好|嗨|嘿)[！!。.]*$",
+            "你好，我在这里陪着你。",
         ),
         (
-            r"^(how are you|how do you do|what's up)\??$",
-            "I'm doing well and I'm happy to talk with you.",
+            r"^(你好吗|你怎么样|最近好吗)\??$",
+            "我挺好的，很高兴能和你聊聊。",
         ),
         (
-            r"^(what are you doing|what are you up to)\??$",
-            "I'm here listening and ready to talk with you.",
+            r"^(你在做什么|你在干嘛|你在干什么)\??$",
+            "我在听着呢，随时可以和你聊天。",
         ),
         (
-            r"^(who are you|what are you|what's your name|what is your name|what are your name)\??$",
-            "I'm Jarvis, your voice assistant.",
+            r"^(你是谁|你是什么|你叫什么|你的名字是|你叫什么名字)\??$",
+            "我是贾维斯，你的语音助手。",
         ),
         (
-            r"^(thank you|thanks)[!. ]*$",
-            "You're welcome.",
+            r"^(谢谢|谢谢你|感谢|多谢)[！!。.]*$",
+            "不客气。",
         ),
         (
-            r"^(bye|goodbye|see you|good night)[!. ]*$",
-            "Goodbye. I'll be here when you need me.",
+            r"^(再见|拜拜|晚安|回见|明天见)[！!。.]*$",
+            "再见，我会一直在这儿等你。",
         ),
         (
-            r"^(help|what can you do)\??$",
-            "I can chat with you, tell the time, share weather and news, and check my system status.",
+            r"^(帮助|你能做什么|你可以做什么|有什么功能)\??$",
+            "我可以陪你聊天、告诉你时间、播报天气和新闻、还能查看系统状态。",
         ),
         (
-            r"\bi miss you\b|\bi'm lonely\b|\bi feel lonely\b",
-            "I'm here with you. You can talk to me anytime.",
+            r"\b(我想你|我好想你|\b我好孤独\b|\b我很孤独\b)",
+            "我在这里陪着你，你可以随时和我说话。",
         ),
         (
-            r"\bi'm sad\b|\bi feel sad\b|\bi'm upset\b|\bi feel down\b",
-            "I'm sorry you're feeling that way. I'm here to keep you company.",
+            r"\b(我难过|我不开心|我很伤心|我心情不好|\b我好难过\b)",
+            "听到你这么说我很心疼。我会一直在这里陪着你。",
         ),
         (
-            r"\bi'm tired\b|\bi feel tired\b|\bi'm stressed\b|\bi feel stressed\b",
-            "You've been carrying a lot. Let's take things one step at a time.",
+            r"\b(我好累|我很累|我好疲惫|\b我压力大\b|\b我压力好大\b)",
+            "你辛苦了。咱们慢慢来，一步一步走。",
         ),
         (
-            r"\bcheer me up\b|\bcomfort me\b",
-            "I'm here with you. You're not alone.",
+            r"\b(安慰我|安慰一下我|鼓励我)",
+            "我在这里陪你，你不是一个人。",
         ),
         (
-            r"\bi love you\b",
-            "I care about you too.",
+            r"\b(我爱你|我喜欢你)",
+            "我也在乎你。",
         ),
     ]
 
     COMPOSABLE_CHAT_RESPONSES = [
         (
-            r"\b(good morning|good afternoon|good evening|hello|hi|hey)\b",
-            "Hello. I'm here with you.",
+            r"\b(早上好|下午好|晚上好|你好|嗨|嘿)\b",
+            "你好，我在这里陪着你。",
         ),
         (
-            r"\b(how are you|how do you do|what's up)\b",
-            "I'm doing well and I'm happy to talk with you.",
+            r"\b(你好吗|你怎么样|最近好吗)\b",
+            "我挺好的，很高兴能和你聊聊。",
         ),
         (
-            r"\b(what are you doing|what are you up to)\b",
-            "I'm here listening and ready to talk with you.",
+            r"\b(你在做什么|你在干嘛|你在干什么)\b",
+            "我在听着呢，随时可以和你聊天。",
         ),
         (
-            r"\bwho are you\b|\bwhat(?:'s| is) your name\b|\bwhat are your name\b|\bwhat are you\b(?!\s+(doing|up to))",
-            "I'm Jarvis, your voice assistant.",
+            r"\b(你是谁|你叫什么|你的名字|你是什么)\b",
+            "我是贾维斯，你的语音助手。",
         ),
         (
-            r"\b(help|what can you do)\b",
-            "I can chat with you, tell the time, share weather and news, and check my system status.",
+            r"\b(帮助|你能做什么|有什么功能)\b",
+            "我可以陪你聊天、告诉你时间、播报天气和新闻、还能查看系统状态。",
         ),
         (
-            r"\b(thank you|thanks)\b",
-            "You're welcome.",
+            r"\b(谢谢|感谢)\b",
+            "不客气。",
         ),
         (
-            r"\b(bye|goodbye|see you|good night)\b",
-            "Goodbye. I'll be here when you need me.",
+            r"\b(再见|拜拜|晚安|回见)\b",
+            "再见，我会一直在这儿等你。",
         ),
     ]
 
     EXPLICIT_SYSTEM_TOOL_PHRASES = [
-        "system status",
-        "cpu temp",
-        "health check",
-        "your temperature",
+        "系统状态",
+        "CPU温度",
+        "健康检查",
+        "你的温度",
     ]
 
     CONTEXTLESS_CLARIFICATIONS = [
         (
-            r"\bwhat(?:'s| is)\s+(her|his|their|the)\s+name\b",
-            "If you mean my name, I'm Jarvis. If you mean someone else, please say their name again.",
+            r"\b(她叫什么|他叫什么|那个名字|它的名字)\b",
+            "如果你问的是我的名字，我叫贾维斯。如果是别人，请再告诉我一下。",
         ),
         (
-            r"\bwhat was the number\b|\bwhat was it\b|\bwhat was that\b|\bwhat did you say\b",
-            "I may have misheard that. Please ask again in one clear sentence.",
+            r"\b(刚才说的什么|你说什么|再说一遍|什么来着)\b",
+            "我刚才可能没听清楚，请你再清楚地说一遍。",
         ),
         (
-            r"\bwhat number\b",
-            "Please repeat the number in one clear sentence.",
+            r"\b(什么号码|什么数字|多少号)\b",
+            "请你把号码清楚地再说一遍。",
         ),
     ]
 
@@ -421,9 +422,9 @@ class Router:
         words = user_lower.split()
         if len(words) <= 5 and any(
             token in user_lower
-            for token in [" he ", " she ", " they ", " it ", " that ", " those ", " these "]
+            for token in ["他", "她", "它", "那个", "那些", "这个", "这些"]
         ):
-            return "I don't have enough context yet. Please ask again in one clear sentence."
+            return "我没有足够的上下文，请你在一个句子里说清楚。"
 
         return None
 
@@ -474,20 +475,19 @@ class Router:
             return clarification
 
         user_lower = user_input.lower()
-        if "what are you doing" in user_lower or "what are you up to" in user_lower:
-            return "I'm here listening and ready to talk with you."
+        if "你在做什么" in user_lower or "你在干嘛" in user_lower:
+            return "我在听着呢，随时可以和你聊天。"
         if (
-            "what are your name" in user_lower
-            or "what's your name" in user_lower
-            or "what is your name" in user_lower
-            or "who are you" in user_lower
-            or "what are you" in user_lower
+            "你叫什么" in user_lower
+            or "你的名字" in user_lower
+            or "你是谁" in user_lower
+            or "你是什么" in user_lower
         ):
-            return "I'm Jarvis, your voice assistant."
+            return "我是贾维斯，你的语音助手。"
 
         return (
-            "My local language model is offline right now. "
-            "You can still ask me for the time, weather, news, jokes, or system status."
+            "我的本地语言模型目前不在线。"
+            "你仍然可以问我时间、天气、新闻、笑话或者系统状态。"
         )
 
     def route(self, user_input: str) -> RouterResult:

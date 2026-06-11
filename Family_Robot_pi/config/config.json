@@ -1,7 +1,9 @@
 {
   "piper_voice": "piper/voices/en_GB-semaine-medium.onnx",
+  "edge_tts_voice": "zh-CN-XiaoxiaoNeural",
   "whisper_path": "/usr/local/bin/whisper-cpp",
-  "whisper_model": "whisper.cpp/models/ggml-tiny.en-q5_0.bin",
+  "whisper_model": "whisper.cpp/models/ggml-base.bin",
+  "stt_language": "zh",
   "chat_model": "qwen2.5:1.5b",
   "ollama_timeout": 120.0,
   "ollama_num_predict": 64,

@@ -216,8 +216,22 @@ class AudioManager:
         return normalized[::3]
 
     def play_wav(self, filepath: str):
-        """Play a WAV file through the configured speaker."""
+        """Play a WAV or MP3 file through the configured speaker."""
         self.mute()
+        try:
+            ext = filepath.rsplit(".", 1)[-1].lower() if "." in filepath else "wav"
+
+            if ext == "mp3":
+                self._play_mp3(filepath)
+            else:
+                self._play_wav_inner(filepath)
+        except Exception as e:
+            print("Playback error: {}".format(e))
+        finally:
+            self.unmute()
+
+    def _play_wav_inner(self, filepath: str):
+        """Play a WAV file via aplay or sounddevice fallback."""
         try:
             subprocess.run(
                 ["aplay", "-D", self.speaker_alsa, filepath],
@@ -234,7 +248,50 @@ class AudioManager:
                 )
                 sd.play(audio_data, wf.getframerate())
                 sd.wait()
-        except Exception as e:
-            print("Playback error: {}".format(e))
-        finally:
-            self.unmute()
+
+    def _play_mp3(self, filepath: str):
+        """Play an MP3 file via ffplay, mpg123, or sounddevice fallback."""
+        # Try ffplay (part of ffmpeg)
+        try:
+            subprocess.run(
+                ["ffplay", "-autoexit", "-nodisp", "-loglevel", "quiet", filepath],
+                check=True,
+                capture_output=True,
+            )
+            return
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            pass
+
+        # Try mpg123
+        try:
+            subprocess.run(
+                ["mpg123", "-q", filepath],
+                check=True,
+                capture_output=True,
+            )
+            return
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            pass
+
+        # Fallback: decode MP3 → WAV via ffmpeg pipe, play with sounddevice
+        try:
+            result = subprocess.run(
+                [
+                    "ffmpeg", "-i", filepath,
+                    "-f", "s16le", "-acodec", "pcm_s16le",
+                    "-ar", "16000", "-ac", "1", "-",
+                ],
+                capture_output=True,
+                check=True,
+            )
+            audio_data = np.frombuffer(result.stdout, dtype=np.int16)
+            sd.play(audio_data, 16000)
+            sd.wait()
+            return
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            pass
+
+        raise RuntimeError(
+            "No MP3 player found. Install ffmpeg (ffplay) or mpg123: "
+            "sudo apt install ffmpeg"
+        )

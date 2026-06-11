@@ -18,7 +18,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from config import Config
 from audio.audio_manager import AudioManager
-from audio.tts_engine import PiperTTS
+from audio.tts_engine import EdgeTTS
 from audio.stt_engine import WhisperSTT
 from brain.ollama_client import OllamaClient
 from brain.router import Router, ToolType
@@ -32,13 +32,13 @@ from brain.cloud_client import KimiClient
 from brain.session_manager import session_manager
 from senses.wake_word_detector import WakeWordDetector
 
-# Pre-generated filler WAVs in assets/fillers/
+# Pre-generated filler WAVs in assets/fillers/ (English — unused in Chinese mode)
 FILLER_WAVS = {
-    "On it!": "assets/fillers/filler_0.wav",
-    "Thinking...": "assets/fillers/filler_1.wav",
-    "Give me a sec.": "assets/fillers/filler_2.wav",
-    "Let me check.": "assets/fillers/filler_3.wav",
-    "Working on it.": "assets/fillers/filler_4.wav",
+    "好的！": "assets/fillers/filler_0.wav",
+    "让我想想...": "assets/fillers/filler_1.wav",
+    "稍等一下。": "assets/fillers/filler_2.wav",
+    "让我查一下。": "assets/fillers/filler_3.wav",
+    "正在处理。": "assets/fillers/filler_4.wav",
 }
 
 PI_USER_ID = 0
@@ -58,7 +58,7 @@ class Orchestrator:
         self._wake_word_started = False
 
         # Initialize components
-        print("Initializing Jarvis...")
+        print("正在初始化贾维斯...")
 
         # Audio
         print("  - Audio manager")
@@ -71,12 +71,13 @@ class Orchestrator:
         )
 
         print("  - TTS engine")
-        self.tts = PiperTTS(model_path=config.piper_voice)
+        self.tts = EdgeTTS(voice=config.edge_tts_voice)
 
         print("  - STT engine")
         self.stt = WhisperSTT(
             whisper_path=config.whisper_path,
-            model_path=config.whisper_model
+            model_path=config.whisper_model,
+            language=config.stt_language,
         )
 
         # Brain
@@ -155,7 +156,7 @@ class Orchestrator:
         # Create persistent Pi chat session for multi-turn conversations
         session_manager.get_or_create(PI_USER_ID)
 
-        print("Initialization complete!")
+        print("初始化完成！")
 
     def start(
         self,
@@ -170,27 +171,27 @@ class Orchestrator:
             signal.signal(signal.SIGTERM, self._signal_handler)
 
         if self.config.enable_local_llm_routing and self.config.warm_up_ollama:
-            print("Warming up Ollama model...")
+            print("正在预热 Ollama 模型...")
             if self.ollama.ensure_model_loaded():
-                print("  - Ollama warm-up complete")
+                print("  - Ollama 预热完成")
             else:
-                print("  - Ollama warm-up skipped")
+                print("  - Ollama 预热跳过")
         elif self.config.enable_local_llm_routing and not self.ollama.is_available():
-            print("  - Ollama is not reachable at http://localhost:11434")
+            print("  - Ollama 无法连接 http://localhost:11434")
 
         if self.config.enable_local_llm_routing and not self.ollama.is_available():
-            print("  - Local chat will stay in fallback mode until `ollama serve` is running")
+            print("  - 本地对话将保持回退模式，直到 ollama serve 运行")
         elif not self.config.enable_local_llm_routing:
-            print("  - Local LLM routing is disabled for Pi 4B fast mode")
-            print("  - Set `enable_local_llm_routing` to true later if hardware is strong enough")
+            print("  - 本地 LLM 路由已禁用（Pi 4B 快速模式）")
+            print("  - 如果硬件性能足够，可将 enable_local_llm_routing 设为 true")
             if self.cloud:
-                print("  - Dialogue will prefer the cloud model")
+                print("  - 对话将优先使用云端模型")
             else:
-                print("  - No cloud key detected, so only rule-based replies and local tools are available")
+                print("  - 未检测到云端 API Key，仅支持规则回复和本地工具")
 
         # Speak startup message BEFORE starting wake word detection
         # (otherwise the speaker saying "Hey Jarvis" triggers the detector)
-        self._speak("Hello! I'm Jarvis. Say hey Jarvis to get my attention.")
+        self._speak("你好！我是贾维斯，你的语音助手。对我说'嘿贾维斯'来唤醒我。")
 
         # Start wake word detection after greeting finishes
         self.wake_word.start(callback=self._on_wake_word)
@@ -202,8 +203,8 @@ class Orchestrator:
         if self.is_remote_session_active():
             self._suspend_emotional_chat("startup")
 
-        print("Jarvis is running. Say 'Hey Jarvis' to activate.")
-        print("Press Ctrl+C to exit.")
+        print("贾维斯已启动。说'嘿贾维斯'来唤醒我。")
+        print("按 Ctrl+C 退出。")
 
         # Main loop
         while self._running:
@@ -215,7 +216,7 @@ class Orchestrator:
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals."""
-        print("\nShutting down...")
+        print("\n正在关闭...")
         self.stop()
 
     def stop(self):
@@ -228,7 +229,7 @@ class Orchestrator:
             if not self._wake_word_started:
                 return
         self.wake_word.pause()
-        print("[mic] Wake word detector paused (mic released for WebRTC)")
+        print("[mic] 唤醒词检测已暂停（麦克风释放给 WebRTC）")
 
     def resume_wake_word_detector(self):
         """Resume wake word detection if system state allows."""
@@ -238,7 +239,7 @@ class Orchestrator:
             if self._remote_session_active:
                 return
         self.wake_word.resume()
-        print("[mic] Wake word detector resumed")
+        print("[mic] 唤醒词检测已恢复")
 
     def is_remote_session_active(self) -> bool:
         with self._state_lock:
@@ -263,7 +264,7 @@ class Orchestrator:
             self._interaction_suspended = True
             wake_word_started = self._wake_word_started
 
-        print(f"[session] Emotional chat paused ({reason})")
+        print(f"[session] 语音助手已暂停 ({reason})")
         if wake_word_started:
             self.wake_word.pause()
 
@@ -276,7 +277,7 @@ class Orchestrator:
             self._interaction_suspended = False
             wake_word_started = self._wake_word_started
 
-        print(f"[session] Emotional chat resumed ({reason})")
+        print(f"[session] 语音助手已恢复 ({reason})")
         if wake_word_started:
             self.wake_word.resume()
 
@@ -302,7 +303,7 @@ class Orchestrator:
         """Speak a voice reminder via TTS, bypassing remote session check."""
         if not text:
             return
-        print(f"Reminder TTS: {text}")
+        print(f"提醒播报: {text}")
         try:
             audio_path = self.tts.synthesize(text)
             self.audio.play_wav(audio_path)
@@ -324,10 +325,10 @@ class Orchestrator:
             return
 
         if self.is_remote_session_active():
-            print("[session] Wake word ignored because remote session is active")
+            print("[session] 远程会话活跃，忽略唤醒词")
             return
 
-        print("Wake word detected!")
+        print("检测到唤醒词！")
         total_start = time.perf_counter()
 
         # Clear conversation history so each wake word starts fresh.
@@ -337,7 +338,7 @@ class Orchestrator:
         self.wake_word.pause()
 
         # Record user speech
-        print("Listening...")
+        print("正在聆听...")
         audio = self._timed(
             "record",
             lambda: self.audio.record_until_silence(
@@ -349,23 +350,23 @@ class Orchestrator:
         )
 
         if audio is None or len(audio) == 0:
-            print("No speech detected")
+            print("未检测到语音")
             self._resume_wake_word_if_allowed()
             return
 
         # Transcribe
-        print("Transcribing...")
+        print("正在识别...")
         try:
             text = self._timed("stt", lambda: self.stt.transcribe_audio_array(audio))
-            print(f"User said: {text}")
+            print(f"用户说: {text}")
         except Exception as e:
-            print(f"Transcription error: {e}")
-            self._speak("Sorry, I didn't catch that.")
+            print(f"识别错误: {e}")
+            self._speak("抱歉，我没有听清楚。")
             self._resume_wake_word_if_allowed()
             return
 
         if not text.strip():
-            self._speak("I didn't hear anything.")
+            self._speak("我没有听到声音。")
             self._resume_wake_word_if_allowed()
             return
 
@@ -377,8 +378,8 @@ class Orchestrator:
         try:
             self._timed("response", lambda: self._process_query(text))
         except Exception as e:
-            print(f"Processing error: {e}")
-            self._speak("Sorry, something went wrong.")
+            print(f"处理错误: {e}")
+            self._speak("抱歉，出了点问题。")
             time.sleep(1)
         finally:
             if self.config.log_stage_timings:
@@ -393,7 +394,7 @@ class Orchestrator:
             return
         phrase = random.choice(list(self._filler_wavs.keys()))
         wav_path = self._filler_wavs[phrase]
-        print(f"Filler: {phrase}")
+        print(f"填充语: {phrase}")
         try:
             self.audio.play_wav(wav_path)
         except Exception as e:
@@ -407,7 +408,7 @@ class Orchestrator:
         session.add_message("user", text)
 
         if result.tool == ToolType.NONE:
-            print("[dialogue] Direct chat response")
+            print("[对话] 直接回复")
             session.add_message("assistant", result.response)
             self._speak(result.response)
 
@@ -425,7 +426,7 @@ class Orchestrator:
                 session.add_message("assistant", response)
                 self._speak(response)
             else:
-                self._speak("Sorry, weather lookup is not configured.")
+                self._speak("抱歉，天气查询功能未配置。")
 
         elif result.tool == ToolType.NEWS:
             if self.news:
@@ -435,7 +436,7 @@ class Orchestrator:
                 session.add_message("assistant", response)
                 self._speak(response)
             else:
-                self._speak("Sorry, news lookup is not configured.")
+                self._speak("抱歉，新闻查询功能未配置。")
 
         elif result.tool == ToolType.SYSTEM_STATUS:
             print("[tool] get_system_status")
@@ -470,14 +471,14 @@ class Orchestrator:
             self._speak(explanation)
 
         elif result.tool == ToolType.CLOUD:
-            print("[cloud] Handing off to cloud AI (moonshot-v1-8k)")
+            print("[云端] 转交云端 AI (moonshot-v1-8k)")
             query = result.arguments.get("query", text)
             self._handle_cloud_query(query)
 
     def _handle_cloud_query(self, query: str):
         """Handle cloud API query with multi-turn conversation history."""
         if not self.cloud:
-            self._speak("Sorry, cloud AI is not configured.")
+            self._speak("抱歉，云端 AI 未配置。")
             return
 
         try:
@@ -492,14 +493,14 @@ class Orchestrator:
             session.add_message("assistant", response)
             self._speak(response)
         except Exception as e:
-            print(f"Cloud error: {e}")
+            print(f"云端错误: {e}")
             if "401" in str(e) or "Unauthorized" in str(e):
-                print("Cloud handoff disabled until the API key is fixed.")
+                print("云端转交已禁用，等待 API Key 修复。")
                 self.cloud = None
                 self.router.set_cloud_handoff_enabled(False)
-                self._speak("The cloud AI key is invalid right now, so cloud replies are disabled.")
+                self._speak("云端 AI 的密钥目前无效，云端回复已禁用。")
             else:
-                self._speak("Sorry, I couldn't reach the cloud AI.")
+                self._speak("抱歉，无法连接到云端 AI。")
 
     def _speak(self, text: str):
         """Speak text through TTS."""
@@ -507,10 +508,10 @@ class Orchestrator:
             return
 
         if self.is_remote_session_active():
-            print("[session] Skip local TTS while remote session is active")
+            print("[session] 远程会话活跃，跳过本地 TTS")
             return
 
-        print(f"Speaking: {text}")
+        print(f"正在播报: {text}")
 
         try:
             audio_path = self.tts.synthesize(text)

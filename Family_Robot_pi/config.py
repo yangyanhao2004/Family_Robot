@@ -19,11 +19,15 @@ class Config:
 
     # Paths
     project_root: str = str(PROJECT_ROOT)
+
+    # TTS
     piper_voice: str = "piper/voices/en_GB-semaine-medium.onnx"
+    edge_tts_voice: str = "zh-CN-XiaoxiaoNeural"  # Microsoft neural Chinese voice
 
     # Whisper.cpp
     whisper_path: str = "/usr/local/bin/whisper-cpp"
-    whisper_model: str = "whisper.cpp/models/ggml-tiny.en-q5_0.bin"
+    whisper_model: str = "whisper.cpp/models/ggml-base.bin"
+    stt_language: str = "zh"
 
     # Models
     chat_model: str = "qwen2.5:1.5b"
