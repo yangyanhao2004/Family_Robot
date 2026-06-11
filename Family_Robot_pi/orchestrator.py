@@ -20,6 +20,7 @@ from config import Config
 from audio.audio_manager import AudioManager
 from audio.tts_engine import EdgeTTS
 from audio.stt_engine import WhisperSTT
+from audio.emotion_detector import EmotionDetector
 from brain.ollama_client import OllamaClient
 from brain.router import Router, ToolType
 from brain.tools.time_tool import get_current_time
@@ -133,6 +134,9 @@ class Orchestrator:
         print("  - Joke tool")
 
         # Senses
+        print("  - Emotion detector")
+        self.emotion = EmotionDetector() if config.enable_emotion_detection else None
+
         print("  - Wake word detector")
         self.wake_word = WakeWordDetector(
             wake_word_name=config.wake_word_name,
@@ -355,6 +359,13 @@ class Orchestrator:
             self._resume_wake_word_if_allowed()
             return
 
+        # Emotion detection (before STT — uses raw audio features)
+        emotion_result = None
+        if self.emotion is not None:
+            emotion_result = self._timed("emotion", lambda: self.emotion.detect(audio))
+            if emotion_result:
+                print(f"  情感: {emotion_result.label} (置信度 {emotion_result.confidence:.2f})")
+
         # Transcribe
         print("正在识别...")
         try:
@@ -377,7 +388,7 @@ class Orchestrator:
 
         # Route and respond
         try:
-            self._timed("response", lambda: self._process_query(text))
+            self._timed("response", lambda: self._process_query(text, emotion_result))
         except Exception as e:
             print(f"处理错误: {e}")
             self._speak("抱歉，出了点问题。")
@@ -401,8 +412,8 @@ class Orchestrator:
         except Exception as e:
             print(f"Filler playback error: {e}")
 
-    def _process_query(self, text: str):
-        """Process user query through router."""
+    def _process_query(self, text: str, emotion_result=None):
+        """Process user query through router, with optional emotion context."""
         result = self._timed("route", lambda: self.router.route(text))
 
         session = session_manager.get_or_create(PI_USER_ID)
@@ -411,7 +422,7 @@ class Orchestrator:
         if result.tool == ToolType.NONE:
             print("[对话] 直接回复")
             session.add_message("assistant", result.response)
-            self._speak(result.response)
+            self._speak(result.response, emotion_result)
 
         elif result.tool == ToolType.TIME:
             print("[tool] get_current_time")
@@ -474,9 +485,9 @@ class Orchestrator:
         elif result.tool == ToolType.CLOUD:
             print("[云端] 转交云端 AI (moonshot-v1-8k)")
             query = result.arguments.get("query", text)
-            self._handle_cloud_query(query)
+            self._handle_cloud_query(query, emotion_result)
 
-    def _handle_cloud_query(self, query: str):
+    def _handle_cloud_query(self, query: str, emotion_result=None):
         """Handle cloud API query with multi-turn conversation history."""
         if not self.cloud:
             self._speak("抱歉，云端 AI 未配置。")
@@ -487,12 +498,18 @@ class Orchestrator:
 
             messages = []
             if self.cloud.soul_prompt:
-                messages.append({"role": "system", "content": self.cloud.soul_prompt})
+                soul = self.cloud.soul_prompt
+                if emotion_result and emotion_result.label != "neutral":
+                    soul += (
+                        f"\n\n用户当前情绪状态：{emotion_result.label}（置信度 {emotion_result.confidence:.0%}）。"
+                        "请在回复中适当体现共情，但不要刻意强调。"
+                    )
+                messages.append({"role": "system", "content": soul})
             messages.extend(session.get_messages())
 
             response = self.cloud.chat_messages(messages)
             session.add_message("assistant", response)
-            self._speak(response)
+            self._speak(response, emotion_result)
         except Exception as e:
             print(f"云端错误: {e}")
             if "401" in str(e) or "Unauthorized" in str(e):
@@ -503,14 +520,26 @@ class Orchestrator:
             else:
                 self._speak("抱歉，无法连接到云端 AI。")
 
-    def _speak(self, text: str):
-        """Speak text through TTS."""
+    _EMOTION_PREFIX = {
+        "sad": "我感觉到你有些难过。",
+        "angry": "我能感受到你的情绪。",
+        "fearful": "别担心，我在这里。",
+        "happy": "听你心情不错！",
+    }
+
+    def _speak(self, text: str, emotion_result=None):
+        """Speak text through TTS, with optional empathetic prefix."""
         if not text:
             return
 
         if self.is_remote_session_active():
             print("[session] 远程会话活跃，跳过本地 TTS")
             return
+
+        # Prepend empathetic prefix for strong emotions
+        if emotion_result and emotion_result.label in self._EMOTION_PREFIX and emotion_result.confidence > 0.6:
+            prefix = self._EMOTION_PREFIX[emotion_result.label]
+            text = f"{prefix}{text}"
 
         print(f"正在播报: {text}")
 

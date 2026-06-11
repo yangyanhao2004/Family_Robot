@@ -71,6 +71,7 @@ class Config:
 
     # Features
     enable_filler_audio: bool = False
+    enable_emotion_detection: bool = True
     log_stage_timings: bool = True
 
     # External service URLs
