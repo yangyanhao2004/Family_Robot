@@ -20,11 +20,15 @@ class KimiClient:
         # Prefer DeepSeek if key is set
         deepseek_key = os.getenv("DEEPSEEK_API_KEY")
         if deepseek_key:
+            key_preview = deepseek_key[:7] + "..." if len(deepseek_key) > 10 else "???"
+            print(f"[cloud] Using DeepSeek (key={key_preview}, len={len(deepseek_key)})")
             return ("https://api.deepseek.com/v1", "deepseek-chat", deepseek_key)
 
         # Fallback to Moonshot
         moonshot_key = os.getenv("MOONSHOT_API_KEY")
         if moonshot_key:
+            key_preview = moonshot_key[:7] + "..." if len(moonshot_key) > 10 else "???"
+            print(f"[cloud] Using Moonshot (key={key_preview}, len={len(moonshot_key)})")
             return ("https://api.moonshot.cn/v1", "moonshot-v1-8k", moonshot_key)
 
         raise ValueError("Set DEEPSEEK_API_KEY or MOONSHOT_API_KEY in .env")
@@ -35,7 +39,7 @@ class KimiClient:
         soul_path: Optional[str] = None,
     ):
         self.base_url, self.model, key = self._detect_provider()
-        self.api_key = api_key or key
+        self.api_key = (api_key or key).strip()
 
         self.client = httpx.Client(
             timeout=60.0,
@@ -44,6 +48,7 @@ class KimiClient:
                 "Content-Type": "application/json",
             },
         )
+        print(f"[cloud] Endpoint: {self.base_url}  Model: {self.model}")
 
         self.soul_prompt = ""
         if soul_path and Path(soul_path).exists():
