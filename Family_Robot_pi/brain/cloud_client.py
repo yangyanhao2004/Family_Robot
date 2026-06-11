@@ -60,7 +60,7 @@ class KimiClient:
         import time
 
         payload = {
-            "model": "moonshot-v1-32k",
+            "model": "moonshot-v1-8k",
             "messages": messages,
             "stream": False,
         }
