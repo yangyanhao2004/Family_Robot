@@ -301,6 +301,13 @@ class Router:
         user_lower = user_input.lower()
         response_lower = (response_text or "").lower()
 
+        import sys
+        u8 = user_lower.encode("utf-8", errors="replace")
+        p0 = self.WEATHER_PHRASES[0].encode("utf-8", errors="replace")
+        print(f"[router-hex] user_lower({len(user_lower)}c, {len(u8)}b)={u8.hex()}", file=sys.stderr, flush=True)
+        print(f"[router-hex] WEATHER[0]={p0.hex()} -> {self.WEATHER_PHRASES[0]!r}", file=sys.stderr, flush=True)
+        print(f"[router-hex] match={self.WEATHER_PHRASES[0] in user_lower}", file=sys.stderr, flush=True)
+
         if "get_current_time" in response_lower:
             return ToolType.TIME, {}
         if "get_weather" in response_lower:
