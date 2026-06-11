@@ -237,8 +237,10 @@ class Router:
             if phrase in user_lower:
                 return True
 
-        words = user_lower.split()
-        return len(words) <= 3 and "?" not in user_input
+        # For Chinese: split() doesn't work (no spaces). Use character count.
+        # A short greeting like "你好" should be local; longer queries go to cloud.
+        clean = user_lower.replace("?", "").replace("！", "").replace("，", "").replace("。", "").replace(" ", "")
+        return len(clean) <= 4 and "?" not in user_input
 
     def _extract_news_category(self, user_input: str) -> str:
         """Extract news category from user input."""
