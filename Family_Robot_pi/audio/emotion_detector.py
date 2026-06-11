@@ -172,25 +172,26 @@ class EmotionDetector:
         zcr = f["zcr_mean"]
         rate = f["speech_rate"]
 
-        # Thresholds (empirical, tuned for 16kHz close-talk mic)
+        # Thresholds tuned for Chinese speech (higher natural F0 than English)
         high_energy = e_mean > 0.08
-        low_energy = e_mean < 0.025
-        high_pitch = p_mean > 180
-        low_pitch = p_mean < 110
+        low_energy = e_mean < 0.018
+        high_pitch = p_mean > 230       # Chinese: higher baseline
+        low_pitch = p_mean < 130        # Chinese: higher baseline
+        very_high_pitch_var = p_std > 55
         high_pitch_var = p_std > 40
-        fast = rate > 5.0
-        slow = rate < 2.5
+        fast = rate > 5.5
+        slow = rate < 2.2
 
-        if high_energy and high_pitch_var and fast:
+        if high_energy and very_high_pitch_var and fast:
             return "angry", 0.75
         if high_pitch and high_energy and fast:
-            return "happy", 0.80
-        if high_pitch and not high_energy and high_pitch_var:
-            return "fearful", 0.65
-        if low_pitch and low_energy and slow:
-            return "sad", 0.78
-        if low_energy and low_pitch:
-            return "sad", 0.60
+            return "happy", 0.78
+        if high_pitch and high_pitch_var and not high_energy and not slow:
+            return "fearful", 0.60
+        if low_pitch and low_energy:
+            return "sad", 0.75
+        if low_energy and slow:
+            return "sad", 0.65
 
         # Default
-        return "neutral", 0.70
+        return "neutral", 0.72
