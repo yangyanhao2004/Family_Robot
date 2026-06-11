@@ -549,6 +549,14 @@ class Router:
             tool_type, arguments = self._detect_tool_from_text(user_input, "")
             self.conversation_history.append({"role": "user", "content": user_input})
 
+            # NONE: if cloud is up, send there; otherwise use offline fallback
+            if tool_type == ToolType.NONE:
+                if self.allow_cloud_handoff:
+                    return RouterResult(tool=ToolType.CLOUD, response=None, arguments={"query": user_input})
+                response = self._offline_chat_response(user_input)
+                self.conversation_history.append({"role": "assistant", "content": response})
+                return RouterResult(tool=ToolType.NONE, response=response, arguments={})
+
             if tool_type == ToolType.CLOUD and not self.allow_cloud_handoff:
                 response = self._offline_chat_response(user_input)
                 self.conversation_history.append(
