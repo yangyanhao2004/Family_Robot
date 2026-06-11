@@ -444,7 +444,7 @@ class Orchestrator:
             print("[tool] get_current_time")
             response = get_current_time()
             session.add_message("assistant", response)
-            self._speak(response)
+            self._speak(response, emotion_result)
 
         elif result.tool == ToolType.WEATHER:
             if self.weather:
@@ -452,9 +452,9 @@ class Orchestrator:
                 print(f"[tool] get_weather -> {location}")
                 response = self.weather.get_weather(location)
                 session.add_message("assistant", response)
-                self._speak(response)
+                self._speak(response, emotion_result)
             else:
-                self._speak("抱歉，天气查询功能未配置。")
+                self._speak("抱歉，天气查询功能未配置。", emotion_result)
 
         elif result.tool == ToolType.NEWS:
             if self.news:
@@ -462,21 +462,21 @@ class Orchestrator:
                 print(f"[tool] get_news -> {category or 'general'}")
                 response = self.news.get_news(category)
                 session.add_message("assistant", response)
-                self._speak(response)
+                self._speak(response, emotion_result)
             else:
-                self._speak("抱歉，新闻查询功能未配置。")
+                self._speak("抱歉，新闻查询功能未配置。", emotion_result)
 
         elif result.tool == ToolType.SYSTEM_STATUS:
             print("[tool] get_system_status")
             response = get_system_status()
             session.add_message("assistant", response)
-            self._speak(response)
+            self._speak(response, emotion_result)
 
         elif result.tool == ToolType.JOKE:
             print("[tool] get_joke")
             response = get_joke()
             session.add_message("assistant", response)
-            self._speak(response)
+            self._speak(response, emotion_result)
 
         elif result.tool == ToolType.COMMAND:
             # Set low speed for controlled movement
@@ -496,7 +496,7 @@ class Orchestrator:
                 enqueue_voice_command(cmd, 90.0, duration)
             explanation = result.arguments.get("explanation", "OK")
             session.add_message("assistant", explanation)
-            self._speak(explanation)
+            self._speak(explanation, emotion_result)
 
         elif result.tool == ToolType.CLOUD:
             print("[云端] 转交云端 AI (moonshot-v1-8k)")
