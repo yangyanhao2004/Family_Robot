@@ -55,7 +55,7 @@ class KimiClient:
     def chat_messages(self, messages: list) -> str:
         """Send multi-turn messages to Kimi and return the response."""
         payload = {
-            "model": "moonshot-v1-8k",
+            "model": "moonshot-v1-32k",
             "messages": messages,
             "stream": False
         }
