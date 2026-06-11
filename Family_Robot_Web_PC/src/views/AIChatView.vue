@@ -24,7 +24,7 @@ watch(() => chatStore.messages.length, scrollToBottom)
 
 function onAIResponse(msg: WebSocketMessage) {
   if (msg.type !== 'ai_chat_response') return
-  const payload = msg.payload as { text: string; action: string; data?: any }
+  const payload = msg.payload as { text: string; action: string; data?: any; error?: boolean; originalMessage?: string }
   if (!payload) return
   isSending.value = false
   chatStore.addAssistantMessage({
@@ -32,6 +32,10 @@ function onAIResponse(msg: WebSocketMessage) {
     action: (payload.action as any) || 'chat_reply',
     data: payload.data,
   })
+  // Auto-fill input on error for one-click retry
+  if (payload.error && payload.originalMessage) {
+    inputText.value = payload.originalMessage
+  }
 }
 
 function sendMessage() {
@@ -102,6 +106,14 @@ onUnmounted(() => {
           ]"
         >
           <p>{{ msg.content }}</p>
+          <!-- Retry button for error messages -->
+          <button
+            v-if="msg.content?.startsWith('⚠️')"
+            @click="sendMessage"
+            class="mt-2 text-xs px-3 py-1 rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
+          >
+            🔄 点此重发（已自动回填）
+          </button>
           <!-- Action indicator -->
           <div
             v-if="msg.action && msg.action !== 'chat_reply'"

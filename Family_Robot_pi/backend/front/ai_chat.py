@@ -504,7 +504,14 @@ async def handle_ai_chat(message: Dict[str, Any]):
         if "401" in str(e) or "Unauthorized" in str(e):
             _kimi_client = None
         # Return a user-friendly error with the original message for retry
-        error_text = f"⚠️ 回复失败，请点击重发\n（{str(e)[:80]}）"
+        err_msg = str(e)
+        if "429" in err_msg:
+            hint = "请求太频繁，稍等几秒后输入框会自动回填，直接按回车重发即可"
+        elif "401" in err_msg:
+            hint = "API Key 失效"
+        else:
+            hint = err_msg[:60]
+        error_text = f"⚠️ 回复失败：{hint}"
         await manager.send_to_web({
             "type": "ai_chat_response",
             "payload": {
