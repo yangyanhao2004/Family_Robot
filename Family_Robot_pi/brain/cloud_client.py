@@ -59,7 +59,7 @@ class KimiClient:
         The caller (web/voice) should surface a clear wait-and-retry message.
         """
         payload = {
-            "model": "kimi-latest",
+            "model": "moonshot-v1-8k",
             "messages": messages,
             "stream": False,
         }
