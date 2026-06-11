@@ -39,7 +39,10 @@ class KimiClient:
         soul_path: Optional[str] = None,
     ):
         self.base_url, self.model, key = self._detect_provider()
-        self.api_key = (api_key or key).strip()
+        # Prefer auto-detected key over explicitly-passed key
+        # (explicit key may be from a different provider, e.g. Moonshot key passed
+        #  while DeepSeek is detected — which would cause 401)
+        self.api_key = (key or (api_key or "").strip()).strip()
 
         self.client = httpx.Client(
             timeout=60.0,

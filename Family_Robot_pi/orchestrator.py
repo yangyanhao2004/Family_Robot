@@ -120,16 +120,13 @@ class Orchestrator:
             except Exception as e:
                 print(f"    Warning: News tool unavailable: {e}")
 
-        if config.moonshot_api_key:
+        # Cloud client auto-detects DeepSeek or Moonshot from env vars
+        try:
+            self.cloud = KimiClient(soul_path=config.cloud_soul_path)
+            self.router.set_cloud_handoff_enabled(True)
             print("  - Cloud client")
-            try:
-                self.cloud = KimiClient(
-                    api_key=config.moonshot_api_key,
-                    soul_path=config.cloud_soul_path
-                )
-                self.router.set_cloud_handoff_enabled(True)
-            except Exception as e:
-                print(f"    Warning: Cloud client unavailable: {e}")
+        except Exception as e:
+            print(f"    Warning: Cloud client unavailable: {e}")
 
         print("  - System status tool")
         print("  - Joke tool")
