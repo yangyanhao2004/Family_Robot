@@ -51,14 +51,24 @@ class TextSentiment:
         ("不敢", 1), ("吓人", 2), ("危险", 2), ("可怕", 3), ("糟糕", 1),
     ]
 
-    # Domain-specific context: whispering or sing-song voice often mis-detected
-    # as neutral.  Text helps here.
+    # Self-contained Traditional → Simplified mapping for sentiment keywords.
+    # Covers the subset of Trad chars that appear in our emotional vocabulary.
+    _T2S = str.maketrans(
+        "開興歡樂愛難傷過氣殺擔憂緊張驚嚇惱厭惡",
+        "开兴欢乐爱难伤过气杀担忧紧张惊吓恼厌恶",
+    )
+
+    @classmethod
+    def _simplify(cls, text: str) -> str:
+        return text.translate(cls._T2S)
 
     @classmethod
     def analyze(cls, text: str) -> SentimentResult:
         """Analyze sentiment of Chinese text."""
         if not text or not text.strip():
             return SentimentResult("neutral", 0.0, 0.5)
+
+        text = cls._simplify(text)  # Normalize Traditional → Simplified
 
         scores = {"happy": 0.0, "sad": 0.0, "angry": 0.0, "fearful": 0.0}
 
