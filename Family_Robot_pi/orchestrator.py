@@ -496,7 +496,7 @@ class Orchestrator:
                 enqueue_voice_command(cmd, 90.0, duration)
             explanation = result.arguments.get("explanation", "OK")
             session.add_message("assistant", explanation)
-            self._speak(explanation, emotion_result)
+            self._speak(explanation)  # no emotion prefix for commands
 
         elif result.tool == ToolType.CLOUD:
             print("[云端] 转交云端 AI (moonshot-v1-8k)")
