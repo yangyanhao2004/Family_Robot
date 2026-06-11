@@ -113,7 +113,7 @@ class WhisperSTT:
         whisper_path: str = str(DEFAULT_WHISPER_PATH),
         model_path: str = str(DEFAULT_WHISPER_MODEL),
         language: str = "zh",
-        threads: int = 4,
+        threads: int = 2,
     ):
         self.whisper_path = str(_resolve_whisper_binary(whisper_path))
         self.model_path = str(_resolve_whisper_model(model_path))

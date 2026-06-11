@@ -78,6 +78,7 @@ class Orchestrator:
             whisper_path=config.whisper_path,
             model_path=config.whisper_model,
             language=config.stt_language,
+            threads=config.whisper_threads,
         )
 
         # Brain

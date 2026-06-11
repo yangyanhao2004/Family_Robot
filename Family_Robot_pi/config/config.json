@@ -4,6 +4,7 @@
   "whisper_path": "/usr/local/bin/whisper-cpp",
   "whisper_model": "whisper.cpp/models/ggml-base.bin",
   "stt_language": "zh",
+  "whisper_threads": 2,
   "chat_model": "qwen2.5:1.5b",
   "ollama_timeout": 120.0,
   "ollama_num_predict": 64,
