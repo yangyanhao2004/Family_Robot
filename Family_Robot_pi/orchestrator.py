@@ -383,8 +383,10 @@ class Orchestrator:
             self._resume_wake_word_if_allowed()
             return
 
-        # Text sentiment (after STT — uses recognized text)
-        text_sentiment = TextSentiment.analyze(text)
+        # Text sentiment (after STT — simplify Traditional → Simplified for matching)
+        from brain.router import Router
+        text_simp = Router._simplify(text)
+        text_sentiment = TextSentiment.analyze(text_simp)
         print(f"  文本情感: {text_sentiment.label} (极性 {text_sentiment.polarity:+.2f}, 置信度 {text_sentiment.confidence:.2f})")
 
         # Fuse acoustic + text emotion

@@ -19,6 +19,8 @@ class TextSentiment:
     """Heuristic Chinese sentiment from keyword presence and weights."""
 
     # Weighted emotion keywords. Format: (word, weight) where weight > 0
+    # Keywords cover both Simplified and Traditional Chinese (whisper.cpp outputs
+    # Traditional with -l zh, but _simplify is called before analyze in orchestrator).
     HAPPY = [
         ("开心", 2), ("高兴", 2), ("快乐", 2), ("太棒", 3), ("太好了", 3),
         ("喜欢", 2), ("爱你", 3), ("真好", 2), ("幸福", 3), ("哈哈", 3),
@@ -39,7 +41,7 @@ class TextSentiment:
         ("气死", 3), ("滚", 2), ("混蛋", 3), ("讨厌", 2), ("烦死", 3),
         ("别烦", 3), ("闭嘴", 3), ("欠揍", 3), ("操", 3), ("妈的", 3),
         ("气人", 3), ("可恶", 2), ("恶心", 2), ("废物", 3), ("愚蠢", 2),
-        ("白痴", 3), ("什么玩意", 3), ("受不了", 2), ("妈的", 3), ("我靠", 2),
+        ("白痴", 3), ("什么玩意", 3), ("受不了", 2), ("我靠", 2),
         ("去死", 3), ("垃圾", 2), ("烂", 1), ("差劲", 2), ("太过分", 2),
     ]
 
