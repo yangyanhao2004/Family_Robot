@@ -20,7 +20,7 @@ class VoiceReminderRequest(BaseModel):
 
 
 async def _process_voice_reminder(reminder_id: int, text: str, user_id: int):
-    """Forward voice reminder to Pi in background (text is already in English from Java side)."""
+    """Forward voice reminder to Pi in background."""
     try:
         await manager.send_to_pi({
             "type": "voice_reminder",

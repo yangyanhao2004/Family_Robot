@@ -466,7 +466,7 @@ async def handle_ai_chat(message: Dict[str, Any]):
 
         system_prompt = get_web_ai_system_prompt() + emotion_ctx
         if user_email:
-            system_prompt += f"\n\nThe current user's email address is {user_email}. When setting EMAIL reminders for this user, always use this email address. Do NOT ask the user for their email."
+            system_prompt += f"\n\n当前用户的邮箱地址是 {user_email}。设置邮件提醒时请使用此地址，不要询问用户邮箱。"
 
         api_messages = [{"role": "system", "content": system_prompt}]
         api_messages.extend(session.get_messages())
@@ -568,8 +568,9 @@ async def _execute_tool_call(tc, session, user_id: int):
 
         success = await _store_reminder_in_java(user_id, reminder_text, scheduled_time, method, email)
 
-        reply = (f"Reminder set: '{reminder_text}' ({method})" if success
-                 else "Failed to set reminder. Please try again.")
+        method_cn = "语音播报" if method == "VOICE" else "邮件"
+        reply = (f"提醒已设置：'{reminder_text}'（{method_cn}）" if success
+                 else "提醒设置失败，请重试。")
         session.add_message("assistant", reply)
         await manager.send_to_web({
             "type": "ai_chat_response",
