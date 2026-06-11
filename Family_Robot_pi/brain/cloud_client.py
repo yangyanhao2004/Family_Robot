@@ -64,20 +64,23 @@ class KimiClient:
             "messages": messages,
             "stream": False,
         }
-        last_error = None
         for attempt in range(max_retries + 1):
             response = self.client.post(
                 f"{self.BASE_URL}/chat/completions",
                 json=payload,
             )
             if response.status_code == 429:
-                last_error = response
+                body = response.text[:200]
+                print(f"[cloud] 429 response: {body}")
                 if attempt < max_retries:
                     wait = 3 * (2 ** attempt)
-                    print(f"[cloud] 429 rate limited, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
+                    print(f"[cloud] retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
                     time.sleep(wait)
                     continue
+                # All retries exhausted
+                raise RuntimeError(
+                    f"Moonshot API 429 after {max_retries} retries. Response: {body}"
+                )
+
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
-
-        raise RuntimeError("Moonshot API rate limited after {} retries".format(max_retries))
