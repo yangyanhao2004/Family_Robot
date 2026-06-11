@@ -521,8 +521,8 @@ async def handle_ai_chat(message: Dict[str, Any]):
             _kimi_client = None
         # Return a user-friendly error with the original message for retry
         err_msg = str(e)
-        if "429" in err_msg:
-            hint = "请求太频繁，稍等几秒后输入框会自动回填，直接按回车重发即可"
+        if "429" in err_msg or "rate limited" in err_msg.lower():
+            hint = "请求太频繁，请等15秒后重发（已自动回填输入框，按回车即可）"
         elif "401" in err_msg:
             hint = "API Key 失效"
         else:

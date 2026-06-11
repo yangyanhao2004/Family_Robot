@@ -52,35 +52,25 @@ class KimiClient:
 
         return self.chat_messages(messages)
 
-    def chat_messages(self, messages: list, max_retries: int = 3) -> str:
+    def chat_messages(self, messages: list) -> str:
         """Send multi-turn messages to Kimi and return the response.
 
-        Retries on 429 (rate limit) with exponential backoff: 3s, 6s, 12s.
+        Does NOT retry on 429 — retrying burns the rate-limit quota faster.
+        The caller (web/voice) should surface a clear wait-and-retry message.
         """
-        import time
-
         payload = {
             "model": "moonshot-v1-8k",
             "messages": messages,
             "stream": False,
         }
-        for attempt in range(max_retries + 1):
-            response = self.client.post(
-                f"{self.BASE_URL}/chat/completions",
-                json=payload,
-            )
-            if response.status_code == 429:
-                body = response.text[:200]
-                print(f"[cloud] 429 response: {body}")
-                if attempt < max_retries:
-                    wait = 3 * (2 ** attempt)
-                    print(f"[cloud] retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
-                    time.sleep(wait)
-                    continue
-                # All retries exhausted
-                raise RuntimeError(
-                    f"Moonshot API 429 after {max_retries} retries. Response: {body}"
-                )
+        response = self.client.post(
+            f"{self.BASE_URL}/chat/completions",
+            json=payload,
+        )
+        if response.status_code == 429:
+            body = response.text[:200]
+            print(f"[cloud] 429: {body}")
+            raise RuntimeError("Moonshot API rate limited. Wait 15 seconds and retry.")
 
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
