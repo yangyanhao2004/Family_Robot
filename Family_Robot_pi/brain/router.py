@@ -283,17 +283,20 @@ class Router:
         if match:
             return match.group(1)
 
-        # Chinese patterns: "\u5317\u4eac\u7684\u5929\u6c14", "\u5317\u4eac\u5929\u6c14", "\u4e0a\u6d77\u600e\u4e48\u6837"
+        # Chinese patterns: "\u4eca\u5929\u5317\u4eac\u7684\u5929\u6c14" / "\u5317\u4eac\u5929\u6c14" / "\u4e0a\u6d77\u600e\u4e48\u6837"
         cn_patterns = [
-            r"([\u4e00-\u9fa5]{2,6})(?:\u7684)(?:\u5929\u6c14|\u6c14\u6e29|\u6e29\u5ea6|\u600e\u4e48\u6837|\u5982\u4f55)",
+            # "\u4eca\u5929\u5317\u4eac\u7684\u5929\u6c14\u600e\u4e48\u6837" -> \u5317\u4eac (non-greedy to skip time prefix)
+            r"(?:\u4eca\u5929|\u660e\u5929|\u6628\u5929|\u73b0\u5728)?([\u4e00-\u9fa5]{2,4}?)(?:\u7684)?(?:\u5929\u6c14|\u6c14\u6e29|\u6e29\u5ea6|\u600e\u4e48\u6837|\u5982\u4f55)",
+            # "\u5929\u6c14\u5728\u5317\u4eac\u600e\u4e48\u6837"
             r"(?:\u5929\u6c14|\u6c14\u6e29|\u6e29\u5ea6)(?:\u5728|\u5173\u4e8e)?([\u4e00-\u9fa5]{2,6})",
-            r"([\u4e00-\u9fa5]{2,6})(?:\u5929\u6c14|\u6c14\u6e29|\u6e29\u5ea6)",
+            # "\u5317\u4eac\u5929\u6c14"
+            r"([\u4e00-\u9fa5]{2,4}?)(?:\u5929\u6c14|\u6c14\u6e29|\u6e29\u5ea6)",
         ]
         for pattern in cn_patterns:
             m = re.search(pattern, user_input)
             if m:
                 loc = m.group(1).strip()
-                if loc not in ("\u4eca\u5929", "\u660e\u5929", "\u73b0\u5728", "\u90a3\u91cc", "\u54ea\u91cc", "\u8fd9\u513f", "\u8fd9\u91cc"):
+                if loc not in ("\u4eca\u5929", "\u660e\u5929", "\u6628\u5929", "\u73b0\u5728", "\u90a3\u91cc", "\u54ea\u91cc", "\u8fd9\u513f", "\u8fd9\u91cc"):
                     return loc
 
         # English patterns
