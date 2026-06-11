@@ -337,11 +337,17 @@ class Router:
                 )
             return ToolType.COMMAND, merged
 
+        # DEBUG: check why tool detection fails for Chinese queries
+        import sys
+        print(f"[router-debug] user_lower={user_lower!r}", file=sys.stderr, flush=True)
+        print(f"[router-debug] WEATHER_PHRASES={self.WEATHER_PHRASES!r}", file=sys.stderr, flush=True)
         for phrase in self.TIME_PHRASES:
             if phrase in user_lower:
                 return ToolType.TIME, {}
         for phrase in self.WEATHER_PHRASES:
-            if phrase in user_lower:
+            matched = phrase in user_lower
+            print(f"[router-debug] phrase={phrase!r} in user? {matched}", file=sys.stderr, flush=True)
+            if matched:
                 return ToolType.WEATHER, {"location": self._extract_location(user_input, "")}
         for phrase in self.NEWS_PHRASES:
             if phrase in user_lower:
