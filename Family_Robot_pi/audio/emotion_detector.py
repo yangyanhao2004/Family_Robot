@@ -101,15 +101,6 @@ class EmotionDetector:
             "speech_rate": speech_rate,
         }
 
-        # ---- Debug: dump features for threshold tuning ----
-        import sys
-        print(
-            f"[emotion-feat] e={energy_mean:.4f} es={energy_std:.4f} "
-            f"p={pitch_mean:.0f} ps={pitch_std:.0f} "
-            f"zcr={zcr_mean:.3f} cent={centroid_mean:.0f} rate={speech_rate:.1f}",
-            file=sys.stderr, flush=True,
-        )
-
         # ---- Heuristic classifier ----
         label, conf = self._classify(features)
         return EmotionResult(label, conf, features)

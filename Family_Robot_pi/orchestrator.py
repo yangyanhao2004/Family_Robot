@@ -21,6 +21,7 @@ from audio.audio_manager import AudioManager
 from audio.tts_engine import EdgeTTS
 from audio.stt_engine import WhisperSTT
 from audio.emotion_detector import EmotionDetector
+from brain.text_sentiment import TextSentiment, fuse_emotions
 from brain.ollama_client import OllamaClient
 from brain.router import Router, ToolType
 from brain.tools.time_tool import get_current_time
@@ -381,6 +382,21 @@ class Orchestrator:
             self._speak("我没有听到声音。")
             self._resume_wake_word_if_allowed()
             return
+
+        # Text sentiment (after STT — uses recognized text)
+        text_sentiment = TextSentiment.analyze(text)
+        print(f"  文本情感: {text_sentiment.label} (极性 {text_sentiment.polarity:+.2f}, 置信度 {text_sentiment.confidence:.2f})")
+
+        # Fuse acoustic + text emotion
+        if emotion_result:
+            fused_label, fused_conf = fuse_emotions(
+                emotion_result.label, emotion_result.confidence,
+                text_sentiment.label, text_sentiment.confidence,
+            )
+            emotion_result.label = fused_label
+            emotion_result.confidence = fused_conf
+            if fused_label != "neutral":
+                print(f"  融合情感: {fused_label} (置信度 {fused_conf:.2f})")
 
         # Speak a random filler phrase before processing when enabled.
         if self.config.enable_filler_audio:
