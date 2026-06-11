@@ -20,6 +20,7 @@ from brain.session_manager import session_manager
 from brain.tools.weather_tool import WeatherTool
 from brain.tools.news_tool import NewsTool
 from brain.tools.joke_tool import get_joke
+from brain.text_sentiment import TextSentiment
 
 logger = logging.getLogger("backend.front.ai_chat")
 
@@ -454,7 +455,16 @@ async def handle_ai_chat(message: Dict[str, Any]):
             except Exception:
                 pass
 
-        system_prompt = get_web_ai_system_prompt()
+        # Emotion detection for empathetic AI response
+        sentiment = TextSentiment.analyze(user_text)
+        emotion_ctx = ""
+        if sentiment.label != "neutral" and sentiment.confidence > 0.6:
+            emotion_ctx = (
+                f"\n\n用户当前情绪状态：{sentiment.label}（置信度 {sentiment.confidence:.0%}）。"
+                "请在回复中适当体现共情，兼顾用户的情绪和意图，但不要刻意强调你在做情感分析。"
+            )
+
+        system_prompt = get_web_ai_system_prompt() + emotion_ctx
         if user_email:
             system_prompt += f"\n\nThe current user's email address is {user_email}. When setting EMAIL reminders for this user, always use this email address. Do NOT ask the user for their email."
 
