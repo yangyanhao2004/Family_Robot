@@ -22,7 +22,7 @@ class ChatSession:
     created_at: datetime = field(default_factory=lambda: datetime.now(tz))
     last_active: datetime = field(default_factory=lambda: datetime.now(tz))
 
-    MAX_TURNS = 50
+    MAX_TURNS = 10  # Kept small to stay within Moonshot Tier0 TPM limits (500K/min)
 
     def add_message(self, role: str, content: str):
         self.messages.append({"role": role, "content": content})

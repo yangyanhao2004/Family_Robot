@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Dict, Any, Optional
 
 import httpx
@@ -54,6 +55,7 @@ _chinese_pattern = re.compile(r'[一-鿿]')
 # ---- Command Queue: sequential execution with duration waits ----
 _cmd_queue: 'asyncio.Queue' = asyncio.Queue(maxsize=100)
 _cmd_worker_started: bool = False
+_last_call_time: Dict[int, float] = {}  # per-user cooldown
 
 
 async def _cmd_queue_worker():
@@ -404,6 +406,18 @@ async def handle_ai_chat(message: Dict[str, Any]):
     session = session_manager.get_or_create(int(user_id))
     session.add_message("user", user_text)
 
+    # Per-user cooldown: block rapid successive calls
+    uid = int(user_id)
+    now = time.monotonic()
+    last = _last_call_time.get(uid, 0)
+    if now - last < 1.5:
+        await manager.send_to_web({
+            "type": "ai_chat_response",
+            "payload": {"text": "请稍后再试，发送太快了。", "action": "chat_reply"}
+        })
+        return
+    _last_call_time[uid] = now
+
     try:
         # ---- Scheme A: Pre-filter clear commands, skip AI entirely ----
         # Skip prefilter for multi-step sequences (then/然后/接着/再) — let AI handle them
@@ -468,8 +482,10 @@ async def handle_ai_chat(message: Dict[str, Any]):
         if user_email:
             system_prompt += f"\n\n当前用户的邮箱地址是 {user_email}。设置邮件提醒时请使用此地址，不要询问用户邮箱。"
 
+        # Only send last 8 turns to stay within TPM limits
+        history = session.get_messages()[-16:]
         api_messages = [{"role": "system", "content": system_prompt}]
-        api_messages.extend(session.get_messages())
+        api_messages.extend(history)
 
         # ---- Scheme B: Plain text chat with response parsing ----
         kimi = _get_kimi()
