@@ -252,7 +252,7 @@ class Router:
         return ""
 
     def _extract_location(self, user_input: str, response_text: str) -> str:
-        """Extract location from user input or model response."""
+        """Extract location from user input or model response (Chinese + English)."""
         match = re.search(
             r'location["\s=:]+["\']*([^"\'\]\s,]+)',
             response_text,
@@ -261,13 +261,26 @@ class Router:
         if match:
             return match.group(1)
 
-        patterns = [
+        # Chinese patterns: "北京的天气", "北京天气", "上海怎么样"
+        cn_patterns = [
+            r"([一-龥]{2,6})(?:的)(?:天气|气温|温度|怎么样|如何)",
+            r"(?:天气|气温|温度)(?:在|关于)?([一-龥]{2,6})",
+            r"([一-龥]{2,6})(?:天气|气温|温度)",
+        ]
+        for pattern in cn_patterns:
+            m = re.search(pattern, user_input)
+            if m:
+                loc = m.group(1).strip()
+                if loc not in ("今天", "明天", "现在", "那里", "哪里", "这儿", "这里"):
+                    return loc
+
+        # English patterns
+        en_patterns = [
             r"weather (?:in|for|at) ([A-Za-z\s]+)",
             r"in ([A-Za-z]+)",
             r"([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)",
         ]
-
-        for pattern in patterns:
+        for pattern in en_patterns:
             match = re.search(pattern, user_input)
             if not match:
                 continue
