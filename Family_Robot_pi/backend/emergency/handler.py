@@ -39,6 +39,7 @@ async def handle_fall_alert(req: FallAlertRequest):
     java_url = __import__("os").getenv("JAVA_BACKEND_URL", "http://localhost:8090")
 
     logger.info("Fall alert triggered for user %d (%s)", user_id, user_name)
+    logger.info("Calling Java backend at %s/api/emergency/send-mail", java_url)
 
     # 1. Ask Java to send emergency email (fire-and-forget)
     mail_result = "email_skipped"
@@ -48,6 +49,7 @@ async def handle_fall_alert(req: FallAlertRequest):
                 f"{java_url}/api/emergency/send-mail",
                 json={"userId": user_id},
             )
+            logger.info("Java response: status=%d body=%s", resp.status_code, resp.text[:200])
             if resp.status_code == 200:
                 data = resp.json()
                 mail_result = data.get("contactEmail", "sent")
