@@ -14,4 +14,6 @@ public class ProfileDto {
     private String email;
     private String role;
     private String lastLogin;
+    private String emergencyContactName;
+    private String emergencyContactEmail;
 }

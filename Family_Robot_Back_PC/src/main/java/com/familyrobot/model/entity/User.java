@@ -33,6 +33,12 @@ public class User {
     @Builder.Default
     private String role = "User";
 
+    @Column(name = "emergency_contact_name", length = 100)
+    private String emergencyContactName;
+
+    @Column(name = "emergency_contact_email", length = 100)
+    private String emergencyContactEmail;
+
     private LocalDateTime lastLogin;
 
     @Column(name = "created_at", nullable = false)

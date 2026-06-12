@@ -134,6 +134,18 @@ def _run_all(args: argparse.Namespace):
             return
         orchestrator.speak_reminder(text)
 
+    def on_fall_alert(text: str):
+        """Callback for emergency fall detection — speaks alert via TTS."""
+        with shared_lock:
+            orchestrator = shared.get("orchestrator")
+        if orchestrator is None:
+            return
+        orchestrator.speak_reminder(text)
+
+    # Register the fall-alert callback with the emergency HTTP endpoint
+    from backend.emergency.handler import set_alert_callback
+    set_alert_callback(on_fall_alert)
+
     def voice_runner():
         try:
             from orchestrator import Orchestrator

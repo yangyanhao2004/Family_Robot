@@ -39,6 +39,25 @@ public class EmailService {
         sendHtmlEmail(to, subject, String.format(TEMPLATE, label, code, footer));
     }
 
+    public void sendEmergencyEmail(String to, String userName, String time, String contactName) {
+        String body = String.format("""
+                <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto;">
+                    <div style="background: #dc2626; padding: 16px; border-radius: 12px 12px 0 0;">
+                        <h1 style="color: white; margin: 0; font-size: 20px;">⚠️ 紧急摔倒告警</h1>
+                    </div>
+                    <div style="background: #fef2f2; padding: 20px; border: 1px solid #fecaca; border-radius: 0 0 12px 12px;">
+                        <p style="font-size: 16px; color: #991b1b; margin: 0 0 12px;">Family Robot 检测到 %s 可能发生摔倒事件。</p>
+                        <p style="color: #7f1d1d;">检测时间：%s</p>
+                        <p style="color: #7f1d1d;">紧急联系人：%s</p>
+                        <hr style="border-color: #fecaca; margin: 16px 0;">
+                        <p style="color: #991b1b; font-weight: bold;">请尽快联系确认安全！</p>
+                        <p style="color: #6b7280; font-size: 12px; margin-top: 16px;">此邮件由 Family Robot 自动发送</p>
+                    </div>
+                </div>
+                """, userName, time, contactName);
+        sendHtmlEmail(to, "⚠️ 紧急告警 — Family Robot 检测到摔倒事件", body);
+    }
+
     public void sendReminderEmail(String to, String reminderText, String scheduledTime) {
         String body = String.format("""
                 <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto;">

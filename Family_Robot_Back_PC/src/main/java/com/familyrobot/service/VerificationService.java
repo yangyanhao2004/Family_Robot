@@ -67,7 +67,8 @@ public class VerificationService {
 
     // ---- Registration ----
 
-    public void sendVerificationCode(String email, String password, String serialNumber) {
+    public void sendVerificationCode(String email, String password, String serialNumber,
+                                       String emergencyContactName, String emergencyContactEmail) {
         if (userRepository.findByEmail(email).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
         }
@@ -80,9 +81,11 @@ public class VerificationService {
         }
 
         String code = newCode();
-        // Store encrypted password + serialNumber as extraData
+        String ecName = emergencyContactName != null ? emergencyContactName : "";
+        String ecEmail = emergencyContactEmail != null ? emergencyContactEmail : "";
+        // Store encrypted password + serialNumber + emergencyContactName + emergencyContactEmail
         saveCode(email, TYPE_REGISTER, code,
-                passwordEncoder.encode(password) + "|" + serialNumber);
+                passwordEncoder.encode(password) + "|" + serialNumber + "|" + ecName + "|" + ecEmail);
 
         emailService.sendVerificationEmail(email, "Family Robot - Email Verification Code", "Your verification code is:", code);
         log.info("Verification code sent to {}", email);
@@ -92,15 +95,20 @@ public class VerificationService {
     public void verify(String email, String code) {
         VerificationCode vc = findAndValidate(email, TYPE_REGISTER, code);
 
-        String[] parts = vc.getExtraData().split("\\|", 2);
+        String extraData = vc.getExtraData();
+        String[] parts = extraData.split("\\|", -1);
         String encodedPassword = parts[0];
         String serialNumber = parts[1];
+        String ecName = parts.length > 2 ? parts[2] : "";
+        String ecEmail = parts.length > 3 ? parts[3] : "";
 
         User user = User.builder()
                 .email(email)
                 .password(encodedPassword)
                 .name(email.split("@")[0])
                 .role("User")
+                .emergencyContactName(ecName.isEmpty() ? null : ecName)
+                .emergencyContactEmail(ecEmail.isEmpty() ? null : ecEmail)
                 .build();
         userRepository.save(user);
 

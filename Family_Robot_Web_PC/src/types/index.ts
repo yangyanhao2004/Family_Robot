@@ -23,6 +23,8 @@ export interface AlbumPhoto {
 export interface RobotSettings {
   firmwareVersion: string
   serialNumber: string
+  emergencyContactName?: string
+  emergencyContactEmail?: string
 }
 
 export interface ChatMessage {

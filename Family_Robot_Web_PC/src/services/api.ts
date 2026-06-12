@@ -56,10 +56,11 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
-  register: (email: string, password: string, serialNumber: string) =>
+  register: (email: string, password: string, serialNumber: string,
+             emergencyContactName?: string, emergencyContactEmail?: string) =>
     request<{ message: string }>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, serialNumber }),
+      body: JSON.stringify({ email, password, serialNumber, emergencyContactName, emergencyContactEmail }),
     }),
 
   verify: (email: string, code: string) =>
@@ -107,7 +108,20 @@ export const api = {
 
   // ---- Settings ----
   getSettings: () =>
-    request<{ firmwareVersion: string; serialNumber: string }>('/api/settings'),
+    request<import('@/types').RobotSettings>('/api/settings'),
+
+  updateEmergencyContact: (name: string, email: string) =>
+    request<import('@/types').RobotSettings>('/api/settings/emergency-contact', {
+      method: 'PUT',
+      body: JSON.stringify({ name, email }),
+    }),
+
+  // ---- Emergency / Fall ----
+  triggerFallAlert: (userId: number, userName: string) =>
+    request<{ status: string }>(`${import.meta.env.VITE_PI_HTTP_URL || 'http://192.168.137.90:8080'}/emergency/fall`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, userName }),
+    }),
 
   // ---- User Profile ----
   getProfile: () =>

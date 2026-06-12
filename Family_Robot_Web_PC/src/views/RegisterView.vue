@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/api'
-import { Bot, Mail, Lock, Cpu, KeyRound, ChevronRight, ArrowLeft } from 'lucide-vue-next'
+import { Bot, Mail, Lock, Cpu, KeyRound, ChevronRight, ArrowLeft, UserRound, Phone } from 'lucide-vue-next'
 
 const router = useRouter()
 
@@ -10,6 +10,8 @@ const step = ref<1 | 2>(1)
 const email = ref('')
 const password = ref('')
 const serialNumber = ref('')
+const emergencyContactName = ref('')
+const emergencyContactEmail = ref('')
 const code = ref('')
 const isLoading = ref(false)
 const errorMsg = ref('')
@@ -19,7 +21,8 @@ async function handleSendCode() {
   isLoading.value = true
   errorMsg.value = ''
   try {
-    await api.register(email.value, password.value, serialNumber.value)
+    await api.register(email.value, password.value, serialNumber.value,
+      emergencyContactName.value || undefined, emergencyContactEmail.value || undefined)
     step.value = 2
   } catch (e) {
     errorMsg.value = (e as Error).message
@@ -130,6 +133,31 @@ async function handleVerify() {
                   placeholder="请输入产品序列号"
                   class="w-full bg-[#141414] border border-[#2A2A2A] text-white rounded-xl py-3 pl-10 pr-4 outline-none focus:border-emerald-500 transition-colors"
                 />
+              </div>
+            </div>
+
+            <!-- Emergency Contact -->
+            <div class="pt-2 border-t border-[#2A2A2A]">
+              <p class="text-xs text-neutral-500 mb-3 px-1">紧急联系人（可选，用于摔倒等紧急情况通知）</p>
+              <div class="space-y-3">
+                <div class="relative">
+                  <UserRound class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
+                  <input
+                    v-model="emergencyContactName"
+                    type="text"
+                    placeholder="紧急联系人姓名"
+                    class="w-full bg-[#141414] border border-[#2A2A2A] text-white rounded-xl py-3 pl-10 pr-4 outline-none focus:border-red-500 transition-colors"
+                  />
+                </div>
+                <div class="relative">
+                  <Mail class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500" />
+                  <input
+                    v-model="emergencyContactEmail"
+                    type="email"
+                    placeholder="紧急联系人邮箱"
+                    class="w-full bg-[#141414] border border-[#2A2A2A] text-white rounded-xl py-3 pl-10 pr-4 outline-none focus:border-red-500 transition-colors"
+                  />
+                </div>
               </div>
             </div>
           </div>

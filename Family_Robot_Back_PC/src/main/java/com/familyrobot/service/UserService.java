@@ -20,6 +20,8 @@ public class UserService {
                 .lastLogin(user.getLastLogin() != null
                         ? user.getLastLogin().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                         : "N/A")
+                .emergencyContactName(user.getEmergencyContactName())
+                .emergencyContactEmail(user.getEmergencyContactEmail())
                 .build();
     }
 }

@@ -4,7 +4,7 @@ import { useRobotStore } from '@/stores/robotStore'
 import { api } from '@/services/api'
 import webRTCService from '@/services/webrtc'
 import webSocketService, { type RobotCommand, type WebSocketMessage } from '@/services/websocket'
-import { Mic, Camera, ArrowUp, ArrowDown, ArrowLeft, ArrowRight } from 'lucide-vue-next'
+import { Mic, Camera, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, AlertTriangle } from 'lucide-vue-next'
 
 const store = useRobotStore()
 const isConnected = () => store.connectionStatus === 'connected'
@@ -54,6 +54,30 @@ function handleCallClick() {
 
 const PYTHON_BACKEND = import.meta.env.VITE_BACKEND_HTTP_URL || 'http://localhost:8080'
 const isTakingPhoto = ref(false)
+
+// Fall simulation
+const isTriggeringFall = ref(false)
+const fallAlert = ref<{ message: string; visible: boolean }>({ message: '', visible: false })
+
+async function triggerFall() {
+  if (isTriggeringFall.value) return
+  isTriggeringFall.value = true
+  try {
+    await api.triggerFallAlert(1, '用户')
+    store.addNotification('摔倒告警已触发！喇叭播报 + 邮件已发送', 'success')
+  } catch (e) {
+    store.addNotification('触发失败: ' + (e as Error).message, 'error')
+  }
+  isTriggeringFall.value = false
+}
+
+function onFallAlert(msg: WebSocketMessage) {
+  if (msg.type !== 'fall_alert') return
+  const payload = msg.payload as { message: string }
+  fallAlert.value = { message: payload.message, visible: true }
+  store.addNotification(payload.message, 'error')
+  setTimeout(() => fallAlert.value.visible = false, 10000)
+}
 
 function handleTakePhotos() {
   if (!isConnected() || isTakingPhoto.value) return
@@ -182,6 +206,7 @@ onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   webSocketService.addMessageListener(onPhotoCaptured)
+  webSocketService.addMessageListener(onFallAlert)
   webRTCService.onCallStateChange(onCallStateChange)
   webRTCService.preAcquireMic()
   refreshMics()
@@ -191,6 +216,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
   webSocketService.removeMessageListener(onPhotoCaptured)
+  webSocketService.removeMessageListener(onFallAlert)
   webRTCService.onCallStateChange(null)
   webRTCService.close()
   callStatus.value = 'idle'
@@ -200,6 +226,16 @@ onUnmounted(() => {
 
 <template>
   <div class="flex flex-col p-5 gap-6">
+    <!-- Fall Alert Banner -->
+    <div v-if="fallAlert.visible"
+      class="bg-red-600/15 border border-red-500/30 rounded-xl p-4 flex items-center gap-3 animate-pulse">
+      <AlertTriangle class="w-6 h-6 text-red-400 shrink-0" />
+      <div class="flex-1">
+        <p class="text-red-400 font-semibold text-sm">{{ fallAlert.message }}</p>
+        <p class="text-red-400/60 text-xs mt-1">紧急邮件已发送，请尽快确认安全</p>
+      </div>
+    </div>
+
     <!-- Mic selector -->
     <div v-if="mics.length > 1" class="flex items-center gap-2">
       <label class="text-xs text-neutral-400">Mic:</label>
@@ -346,6 +382,19 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Fall Simulation -->
+    <div class="border-t border-[#2A2A2A] pt-4">
+      <button
+        @click="triggerFall"
+        :disabled="isTriggeringFall"
+        class="w-full bg-red-600/10 hover:bg-red-600/20 border border-red-500/30 rounded-xl py-4 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+      >
+        <AlertTriangle class="w-5 h-5 text-red-400" />
+        <span class="text-red-400 font-semibold text-sm">{{ isTriggeringFall ? '触发中...' : '🏥 模拟摔倒检测' }}</span>
+      </button>
+      <p class="text-xs text-neutral-500 text-center mt-2">点击模拟摔倒事件，测试紧急告警流程</p>
     </div>
   </div>
 </template>

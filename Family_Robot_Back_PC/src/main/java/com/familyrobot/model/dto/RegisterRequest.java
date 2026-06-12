@@ -14,4 +14,8 @@ public class RegisterRequest {
 
     @NotBlank
     private String serialNumber;
+
+    private String emergencyContactName;
+
+    private String emergencyContactEmail;
 }

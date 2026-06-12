@@ -34,7 +34,8 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<Map<String, String>> register(@Valid @RequestBody RegisterRequest request) {
         verificationService.sendVerificationCode(
-                request.getEmail(), request.getPassword(), request.getSerialNumber());
+                request.getEmail(), request.getPassword(), request.getSerialNumber(),
+                request.getEmergencyContactName(), request.getEmergencyContactEmail());
         return ResponseEntity.ok(Map.of("message", "verification code sent"));
     }
 

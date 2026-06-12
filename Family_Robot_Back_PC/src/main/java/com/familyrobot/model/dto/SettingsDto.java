@@ -12,4 +12,6 @@ import lombok.NoArgsConstructor;
 public class SettingsDto {
     private String firmwareVersion;
     private String serialNumber;
+    private String emergencyContactName;
+    private String emergencyContactEmail;
 }
