@@ -117,11 +117,16 @@ export const api = {
     }),
 
   // ---- Emergency / Fall ----
-  triggerFallAlert: (userId: number, userName: string) =>
-    request<{ status: string }>(`${import.meta.env.VITE_PI_HTTP_URL || 'http://192.168.137.90:8080'}/emergency/fall`, {
+  triggerFallAlert: async (userId: number, userName: string) => {
+    const piBase = import.meta.env.VITE_PI_HTTP_URL || 'http://192.168.137.90:8080'
+    const res = await fetch(`${piBase}/emergency/fall`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, userName }),
-    }),
+    })
+    if (!res.ok) throw new Error(`Fall alert failed (${res.status})`)
+    return res.json()
+  },
 
   // ---- User Profile ----
   getProfile: () =>
