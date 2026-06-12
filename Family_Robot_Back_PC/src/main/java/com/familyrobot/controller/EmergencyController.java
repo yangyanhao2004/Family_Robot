@@ -3,6 +3,7 @@ package com.familyrobot.controller;
 import com.familyrobot.model.entity.User;
 import com.familyrobot.repository.UserRepository;
 import com.familyrobot.service.EmailService;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
