@@ -2,6 +2,7 @@
  * 主控面板 — 对齐 Web 前端 DashboardView.vue + MainLayout.vue
  */
 import router from '@ohos.router'
+import promptAction from '@ohos.promptAction'
 import { webSocketService, ConnectionCallback } from '../services/WebSocketService'
 import { authManager } from '../services/AuthManager'
 import { api } from '../services/ApiService'
@@ -25,6 +26,7 @@ struct DashboardPage {
   }
   @State speedLevel: string = 'medium'
   @State videoUrl: string = getVideoStreamUrl()
+  @State isTriggeringFall: boolean = false
   private wsMsgListener: (msg: WebSocketMessage) => void = (_msg: WebSocketMessage) => {}
 
   aboutToAppear(): void {
@@ -113,6 +115,14 @@ struct DashboardPage {
             }
           })
 
+          // 🏥 模拟摔倒
+          Button(this.isTriggeringFall ? '🏥 触发中...' : '🏥 模拟摔倒检测')
+            .fontSize(13).fontColor('#FFFFFF')
+            .width('100%').height(40)
+            .backgroundColor('#dc2626').borderRadius(12)
+            .enabled(!this.isTriggeringFall)
+            .onClick(() => { this.triggerFallAlert() })
+
           // AI对话 + 相册
           Row({ space: 8 }) {
             Button('💬 AI对话')
@@ -186,6 +196,19 @@ struct DashboardPage {
     .padding({ left: 12, right: 12 })
     .borderRadius(12)
     .backgroundColor('#1E1E1E')
+  }
+
+  private async triggerFallAlert(): Promise<void> {
+    this.isTriggeringFall = true
+    try {
+      let userId: number = authManager.getUserIdFromToken() || 1
+      await api.triggerFallAlert(userId, '用户')
+      promptAction.showToast({ message: '已触发摔倒告警！邮件已发送', duration: 3000 })
+    } catch (err) {
+      promptAction.showToast({ message: '触发失败: ' + (err as Error).message, duration: 2000 })
+    } finally {
+      this.isTriggeringFall = false
+    }
   }
 
   private async onPhotoCaptured(url: string, filename: string): Promise<void> {

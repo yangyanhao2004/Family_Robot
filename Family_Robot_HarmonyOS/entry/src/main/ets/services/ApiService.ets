@@ -8,7 +8,8 @@ import { JAVA_API_URL } from '../common/Constants'
 
 export interface ApiClient {
   login: (email: string, password: string) => Promise<Record<string, Object>>
-  register: (email: string, password: string, serialNumber: string) => Promise<Record<string, Object>>
+  register: (email: string, password: string, serialNumber: string,
+             emergencyContactName?: string, emergencyContactEmail?: string) => Promise<Record<string, Object>>
   verify: (email: string, code: string) => Promise<Record<string, Object>>
   sendLoginCode: (email: string) => Promise<Record<string, Object>>
   verifyLoginCode: (email: string, code: string) => Promise<Record<string, Object>>
@@ -18,6 +19,8 @@ export interface ApiClient {
   deletePhoto: (id: string) => Promise<void>
   addPhoto: (url: string, filename: string) => Promise<Record<string, Object>>
   getSettings: () => Promise<Record<string, Object>>
+  updateEmergencyContact: (name: string, email: string) => Promise<Record<string, Object>>
+  triggerFallAlert: (userId: number, userName: string) => Promise<Record<string, Object>>
   getProfile: () => Promise<Record<string, Object>>
   getReminders: (userId: number) => Promise<Array<Record<string, Object>>>
   createReminder: (data: Record<string, Object>) => Promise<Record<string, Object>>
@@ -116,10 +119,14 @@ class ApiServiceImpl implements ApiClient {
     })
   }
 
-  register(email: string, password: string, serialNumber: string): Promise<Record<string, Object>> {
+  register(email: string, password: string, serialNumber: string,
+           emergencyContactName?: string, emergencyContactEmail?: string): Promise<Record<string, Object>> {
     return doRequest<Record<string, Object>>('/api/auth/register', {
       method: http.RequestMethod.POST,
-      extraData: JSON.stringify({ 'email': email, 'password': password, 'serialNumber': serialNumber })
+      extraData: JSON.stringify({
+        'email': email, 'password': password, 'serialNumber': serialNumber,
+        'emergencyContactName': emergencyContactName || '', 'emergencyContactEmail': emergencyContactEmail || ''
+      })
     })
   }
 
@@ -177,6 +184,21 @@ class ApiServiceImpl implements ApiClient {
   // ==================== Settings ====================
   getSettings(): Promise<Record<string, Object>> {
     return doRequest<Record<string, Object>>('/api/settings')
+  }
+
+  updateEmergencyContact(name: string, email: string): Promise<Record<string, Object>> {
+    return doRequest<Record<string, Object>>('/api/settings/emergency-contact', {
+      method: http.RequestMethod.PUT,
+      extraData: JSON.stringify({ 'name': name, 'email': email })
+    })
+  }
+
+  // ==================== Emergency ====================
+  triggerFallAlert(userId: number, userName: string): Promise<Record<string, Object>> {
+    return doRequest<Record<string, Object>>('http://192.168.137.90:8080/emergency/fall', {
+      method: http.RequestMethod.POST,
+      extraData: JSON.stringify({ 'userId': userId, 'userName': userName })
+    })
   }
 
   // ==================== User Profile ====================

@@ -32,6 +32,8 @@ export interface AlbumPhoto {
 export interface RobotSettings {
   firmwareVersion: string
   serialNumber: string
+  emergencyContactName?: string
+  emergencyContactEmail?: string
 }
 
 // 机器人指令类型
