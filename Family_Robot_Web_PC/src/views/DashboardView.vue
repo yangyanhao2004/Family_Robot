@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRobotStore } from '@/stores/robotStore'
 import { api } from '@/services/api'
 import webRTCService from '@/services/webrtc'
-import webSocketService, { type RobotCommand, type WebSocketMessage } from '@/services/websocket'
+import webSocketService, { type RobotCommand, type WebSocketMessage, getUserIdFromToken } from '@/services/websocket'
 import { Mic, Camera, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, AlertTriangle } from 'lucide-vue-next'
 
 const store = useRobotStore()
@@ -63,7 +63,8 @@ async function triggerFall() {
   if (isTriggeringFall.value) return
   isTriggeringFall.value = true
   try {
-    await api.triggerFallAlert(1, '用户')
+    const uid = getUserIdFromToken() || 1
+    await api.triggerFallAlert(uid, '用户')
     store.addNotification('摔倒告警已触发！喇叭播报 + 邮件已发送', 'success')
   } catch (e) {
     store.addNotification('触发失败: ' + (e as Error).message, 'error')
